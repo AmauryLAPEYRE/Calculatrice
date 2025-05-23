@@ -1,0 +1,22 @@
+# Environnement
+.env
+.env.local
+.env.production
+
+# Secrets
+*.key
+*.pem
+secrets/
+config/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
