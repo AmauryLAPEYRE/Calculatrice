@@ -37,7 +37,8 @@ const ReviewsDisplay = ({
   reviews = [],
   totalReviews = 0,
   averageRating = 0,
-  verifiedReviews = 0
+  verifiedReviews = 0,
+  onUserClick
 }) => {
   const { currentUser, userDetails } = useAuth();
   const [error, setError] = useState(null);
@@ -338,13 +339,21 @@ const ReviewsDisplay = ({
                   <div className="flex items-start justify-between">
                     <div className="flex items-center">
                       {/* Avatar utilisateur */}
-                      <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
+                      <div 
+                        className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4 cursor-pointer hover:from-green-500 hover:to-green-700 transition-all"
+                        onClick={() => onUserClick && onUserClick(review.user_id, review.user_name)}
+                      >
                         {review.user_name.charAt(0).toUpperCase()}
                       </div>
                       
                       <div>
                         <div className="flex items-center gap-3">
-                          <h4 className="font-semibold text-green-800">{review.user_name}</h4>
+                          <h4 
+                            className="font-semibold text-green-800 cursor-pointer hover:text-green-600 transition-colors"
+                            onClick={() => onUserClick && onUserClick(review.user_id, review.user_name)}
+                          >
+                            {review.user_name}
+                          </h4>
                           {review.is_verified && (
                             <span className="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full flex items-center font-medium">
                               <CheckCircle size={14} className="mr-1" />
