@@ -440,7 +440,8 @@ const handleNameSearch = async (newSearch = true, searchQuery = null, filters = 
     activeTab, setActiveTab,
     barcode, setBarcode,
     productName, setProductName,
-    product, searchResults,
+    product, setProduct,           // ← Ajout manquant
+    searchResults, setSearchResults, // ← Ajout manquant
     loading, error, setError,
     totalResults, page,
     searchFilters, filtersApplied,

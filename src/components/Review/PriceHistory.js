@@ -70,7 +70,7 @@ const PriceHistory = ({ productCode, averagePrice }) => {
                       {item.store_name || 'Non spécifié'}
                       {/* Ajout du code postal si disponible */}
                       {item.code_postal && ` (${item.code_postal})`}
-                    </span>
+                    </span>                    
                     {item.average_rating && (
                       <span className="flex items-center text-gray-700 text-sm">
                         <Star size={14} className="text-yellow-400 fill-yellow-400 mr-1" />
@@ -79,7 +79,6 @@ const PriceHistory = ({ productCode, averagePrice }) => {
                     )}
                   </div>
                   <div className="flex items-center text-green-700 font-medium">
-                    <DollarSign size={14} className="text-green-500" />
                     {formatPrice(item.purchase_price)}
                     {item.is_verified && (
                       <CheckCircle size={14} className="ml-1 text-green-600" title="Prix vérifié" />

@@ -133,12 +133,22 @@ export const uploadReceipt = async (file, userId, firebaseUid, productCode = nul
 export const getUserReceipts = async (userId, limit = 10, offset = 0) => {
   try {
     // Récupérer les tickets de caisse
-    const { data, count, error } = await supabase
-      .from('receipts')
-      .select('*', { count: 'exact' })
-      .eq('user_id', userId)
-      .order('upload_date', { ascending: false })
-      .range(offset, offset + limit - 1);
+ const { data, count, error } = await supabase
+  .from('receipts')
+  .select(`
+    *,
+    enseignes (
+      nom,
+      adresse1,
+      adresse2,
+      code_postal,
+      ville,
+      siret
+    )
+  `, { count: 'exact' })
+  .eq('user_id', userId)
+  .order('upload_date', { ascending: false })
+  .range(offset, offset + limit - 1);
       
     if (error) throw error;
     
@@ -221,7 +231,7 @@ export const getRecentReceipts = async (userId, limit = 3) => {
       .from('receipts')
       .select(`
         *,
-        enseignes(id, nom)
+        enseignes(id, nom,code_postal)
       `)
       .eq('user_id', userId)
       .eq('status', 'analyzed')

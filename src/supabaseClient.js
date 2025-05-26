@@ -108,17 +108,18 @@ export const getUserSubscription = async (firebaseUid) => {
       if (userError) throw userError;
       
       // 2. Récupérer tous les abonnements actifs de l'utilisateur
-      const { data: subscriptionsData, error: subscriptionError } = await supabase
-        .from('user_subscriptions')
-        .select(`
+// Puis utiliser la vue avec un order simple :
+const { data: subscriptionsData, error: subscriptionError } = await supabase
+  .from('user_subscriptions_with_plans')
+  .select(`
           *,
           subscription_plans:plan_id (*)
         `)
-        .eq('user_id', userData.id)
-        .eq('is_active', true)
-        .gte('end_date', new Date().toISOString())
-        .order('subscription_plans.priority', { ascending: false })
-        .order('end_date', { ascending: false });
+  .eq('user_id', userData.id)
+  .eq('is_active', true)
+  .gte('end_date', new Date().toISOString())
+  .order('plan_priority', { ascending: false })
+  .order('end_date', { ascending: false });
         
       if (subscriptionError && subscriptionError.code !== 'PGRST116') {
         throw subscriptionError;

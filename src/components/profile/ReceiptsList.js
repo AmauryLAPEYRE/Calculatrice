@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getUserReceipts, deleteReceipt } from '../../services/storageService';
 import ProfileLayout from './ProfileLayout';
-import { Receipt, Calendar, AlertCircle, Trash2,  Loader, Image, ShoppingBag, Search, AlertTriangle, DollarSign, Filter, ZoomIn, ClipboardList } from 'lucide-react';
+import { Receipt, Calendar, AlertCircle, Trash2,  Loader, Image, ShoppingBag, Search, AlertTriangle, DollarSign, Filter, ZoomIn, ClipboardList, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatDate } from '../../utils/formatters';
 import { supabase } from '../../supabaseClient';
@@ -40,7 +40,7 @@ const ReceiptsList = () => {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [currentDetailReceipt, setCurrentDetailReceipt] = useState(null);
   const [receiptItems, setReceiptItems] = useState([]);
-  const [setLoadingItems] = useState(false);
+  const [loadingItems,setLoadingItems] = useState(false);
   
   // Chargement des tickets de l'utilisateur
   useEffect(() => {
@@ -413,7 +413,16 @@ const ReceiptsList = () => {
                           <ShoppingBag size={16} className="text-gray-400 mt-0.5 mr-2" />
                           <div>
                             <p className="text-xs text-gray-500">Magasin</p>
-                            <p className="text-sm font-medium">{receipt.enseigne_name || "Non spécifié"}</p>
+                            <p className="text-sm font-medium">{receipt.enseignes.nom || "Non spécifié"}</p>
+                          </div>
+                        </div>
+                      )}
+                      {receipt.enseigne_id && (
+                        <div className="flex items-start">
+                          <MapPin size={16} className="text-gray-400 mt-0.5 mr-2" />
+                          <div>
+                            <p className="text-xs text-gray-500">CP</p>
+                            <p className="text-sm font-medium">{receipt.enseignes.code_postal || "Non spécifié"}</p>
                           </div>
                         </div>
                       )}

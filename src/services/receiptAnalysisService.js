@@ -263,6 +263,7 @@ if (receipt.total || receipt.date || (enseigne && enseigne.nom)) {
             is_receipt: true,
             date: existingReceipt.receipt_date,
             store: existingReceipt.enseignes?.nom || enseigne.nom || "Enseigne inconnue",
+            code_postal: existingReceipt.enseignes?.code_postal || enseigne.code_postal || "CP inconnu",
             price: existingReceipt.total_ttc,
             items: existingItems.length
           }

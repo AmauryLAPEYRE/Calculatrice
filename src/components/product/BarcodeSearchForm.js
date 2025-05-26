@@ -1,12 +1,9 @@
 // src/components/product/BarcodeSearchForm.js
 import React, { useState } from 'react';
-import { Camera, AlertCircle } from 'lucide-react';
+import { Camera, AlertCircle, Scan, Sparkles } from 'lucide-react';
 import BarcodeScanner from '../BarcodeScanner';
 import { Link } from 'react-router-dom';
 
-/**
- * Formulaire de recherche par code-barres
- */
 const BarcodeSearchForm = ({
   barcode,
   setBarcode,
@@ -19,11 +16,9 @@ const BarcodeSearchForm = ({
   isAuthorized,
   loading
 }) => {
-  // État pour gérer l'affichage des alertes d'autorisation
   const [alertMessage, setAlertMessage] = useState(null);
-  const [alertType, setAlertType] = useState(null); // 'scan' ou 'manual_entry'
+  const [alertType, setAlertType] = useState(null);
 
-  // Gestionnaire pour la touche Entrée
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       if (isAuthorized && !isAuthorized('manual_entry')) {
@@ -35,7 +30,6 @@ const BarcodeSearchForm = ({
     }
   };
   
-  // Ouvrir le scanner de code-barres
   const handleOpenCamera = () => {
     if (!isAuthorized('scan')) {
       showAuthorizationAlert('scan');
@@ -45,7 +39,6 @@ const BarcodeSearchForm = ({
     setShowScanner(true);
   };
   
-  // Lancer la recherche
   const handleSearchClick = () => {
     if (!isAuthorized('manual_entry')) {
       showAuthorizationAlert('manual_entry');
@@ -55,7 +48,6 @@ const BarcodeSearchForm = ({
     onSearch();
   };
 
-  // Afficher un message d'alerte pour les fonctions non autorisées
   const showAuthorizationAlert = (type) => {
     setAlertType(type);
     setAlertMessage(
@@ -64,14 +56,12 @@ const BarcodeSearchForm = ({
         : "Vous avez atteint votre limite quotidienne de recherches manuelles. Passez à un abonnement supérieur pour continuer."
     );
     
-    // Masquer l'alerte après 5 secondes
     setTimeout(() => {
       setAlertMessage(null);
       setAlertType(null);
     }, 5000);
   };
   
-  // Réinitialiser l'alerte
   const dismissAlert = () => {
     setAlertMessage(null);
     setAlertType(null);
@@ -79,10 +69,12 @@ const BarcodeSearchForm = ({
   
   if (showScanner) {
     return (
-      <div className="mb-6">
-        <BarcodeScanner onScanComplete={onScan} autoStart={true} />
+      <div className="space-y-4">
+        <div className="bg-white rounded-2xl shadow-lg p-6">
+          <BarcodeScanner onScanComplete={onScan} autoStart={true} />
+        </div>
         <button
-          className="mt-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors block mx-auto"
+          className="mx-auto flex items-center px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full font-medium transition-all duration-300 shadow-sm hover:shadow-md"
           onClick={() => setShowScanner(false)}
         >
           Annuler le scan
@@ -91,22 +83,25 @@ const BarcodeSearchForm = ({
     );
   }
   
-  // Message d'alerte
+  // Message d'alerte moderne
   const alertComponent = alertMessage && (
-    <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+    <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl shadow-sm animate-fadeIn">
       <div className="flex items-start">
-        <AlertCircle size={16} className="text-amber-500 mr-2 mt-1 flex-shrink-0" />
-        <div className="flex-1">
-          <p className="text-sm text-amber-800">{alertMessage}</p>
-          <div className="mt-2 flex space-x-2">
+        <div className="flex-shrink-0 w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+          <AlertCircle size={20} className="text-amber-600" />
+        </div>
+        <div className="ml-3 flex-1">
+          <p className="text-sm font-medium text-amber-800">{alertMessage}</p>
+          <div className="mt-3 flex space-x-3">
             <Link
               to="/abonnements"
-              className="px-3 py-1 bg-amber-500 text-white text-xs rounded hover:bg-amber-600 transition-colors"
+              className="inline-flex items-center px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-full hover:bg-amber-700 transition-all duration-300 shadow-sm hover:shadow-md"
             >
+              <Sparkles size={14} className="mr-1.5" />
               S'abonner
             </Link>
             <button 
-              className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300 transition-colors"
+              className="inline-flex items-center px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-full hover:bg-gray-50 transition-all duration-300 border border-gray-200"
               onClick={dismissAlert}
             >
               Fermer
@@ -117,34 +112,37 @@ const BarcodeSearchForm = ({
     </div>
   );
   
-  // Version desktop
-  if (!isMobile) {
-    return (
-      <div className="mb-6">
-        {alertComponent}
-        
-        <div className="flex items-center space-x-2">
+  return (
+    <div className="space-y-6">
+      {alertComponent}
+      
+      {/* Barre de recherche moderne */}
+      <div className="flex items-center bg-white rounded-2xl shadow-lg border border-green-100 overflow-hidden transition-all duration-300 hover:shadow-xl">
+        <div className="flex-1 relative">
+          <Scan size={20} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
-            className={`flex-1 px-4 py-2 border ${alertType === 'manual_entry' ? 'border-amber-400 ring-1 ring-amber-400' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-green-500`}
+            className="w-full pl-12 pr-4 py-4 text-lg focus:outline-none font-mono"
             placeholder="Saisissez le code-barres (ex: 3017620422003)"
             value={barcode}
             onChange={(e) => setBarcode(e.target.value)}
             onKeyDown={handleKeyDown}
           />
-          
+        </div>
+        
+        <div className="flex items-center pr-2 space-x-2">
           <button
-            className={`px-4 py-2 ${!isAuthorized('scan') ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'} text-white rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-center`}
+            className={`p-3 ${!isAuthorized('scan') ? 'bg-gray-300 cursor-not-allowed' : 'bg-green-100 hover:bg-green-200 text-green-700'} rounded-xl transition-all duration-300 transform hover:scale-[1.02]`}
             onClick={handleOpenCamera}
             aria-label="Scanner un code-barres"
           >
-            <Camera size={20} />
+            <Camera size={22} />
           </button>
           
           <button
-            className={`px-4 py-2 ${loading || !isAuthorized('manual_entry') ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} text-white rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-center min-w-[100px]`}
+            className={`px-6 py-3 ${loading || !isAuthorized('manual_entry') ? 'bg-gray-300 cursor-not-allowed' : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800'} text-white rounded-xl font-medium transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-[1.02] flex items-center`}
             onClick={handleSearchClick}
             disabled={loading}
           >
@@ -160,51 +158,17 @@ const BarcodeSearchForm = ({
           </button>
         </div>
       </div>
-    );
-  }
-  
-  // Version mobile
-  return (
-    <div className="mb-6 space-y-2">
-      {alertComponent}
       
-      <input
-        type="text"
-        inputMode="numeric"
-        pattern="[0-9]*"
-        className={`w-full px-4 py-2 border ${alertType === 'manual_entry' ? 'border-amber-400 ring-1 ring-amber-400' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-green-500`}
-        placeholder="Saisissez le code-barres (ex: 3017620422003)"
-        value={barcode}
-        onChange={(e) => setBarcode(e.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-      
-      <div className="flex space-x-2">
-        <button
-          className={`flex-1 px-4 py-2 ${!isAuthorized('scan') ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'} text-white rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-center`}
-          onClick={handleOpenCamera}
-          aria-label="Scanner un code-barres"
-        >
-          <Camera size={18} className="mr-1" />
-          <span>Scanner</span>
-        </button>
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
         
-        <button
-          className={`flex-1 px-4 py-2 ${loading || !isAuthorized('manual_entry') ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} text-white rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-center`}
-          onClick={handleSearchClick}
-          disabled={loading}
-        >
-          {loading ? (
-            <>
-              <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Recherche...
-            </>
-          ) : 'Rechercher'}
-        </button>
-      </div>
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 };

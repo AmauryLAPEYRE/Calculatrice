@@ -1,211 +1,230 @@
 // src/components/profile/ProfileMobileNavbar.js
-import React, { useRef, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { 
   User, 
-  Settings, 
-  KeyRound, 
-  Calendar, 
-  History, 
+  Menu, 
+  X, 
   LogOut, 
+  Settings,
   Star,
   Heart,
-  Shield,
-  MoreVertical,
-  Award,
-  X
+  History,
+  ShoppingBag,
+  Receipt,
+  Crown,
+  ChevronRight
 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
 
-const ProfileMobileNavbar = ({ currentUser, title, isMenuOpen, toggleMenu, onLogout, loading }) => {
-  const { userDetails } = useAuth();
-  const location = useLocation();
-  const menuRef = useRef(null);
-  const currentPath = location.pathname;
-
-  // Fermer le menu si on clique en dehors
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        if (isMenuOpen) toggleMenu();
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isMenuOpen, toggleMenu]);
-
-  // Vérifier si le chemin actuel correspond au chemin de navigation
-  const isActivePath = (path) => {
-    return currentPath === path || currentPath.startsWith(`${path}/`);
-  };
-
-  // Vérifier si l'utilisateur est administrateur
-  const isAdmin = userDetails && userDetails.userType === 'Admin';
-
-  // Obtenir la couleur associée au statut de l'utilisateur
-  const getStatusColor = (status) => {
-    switch(status?.toLowerCase()) {
-      case 'bronze': return 'bg-amber-600 text-white';
-      case 'argent': case 'silver': return 'bg-gray-400 text-white';
-      case 'or': case 'gold': return 'bg-yellow-500 text-white';
-      case 'diamant': case 'diamond': return 'bg-blue-400 text-white';
-      default: return 'bg-amber-600 text-white';
+/**
+ * Composant de navigation mobile pour les pages de profil
+ * Applique le Design System Fydo - Mode PROFIL (compact, efficace, productif)
+ */
+const ProfileMobileNavbar = ({ 
+  currentUser, 
+  title, 
+  isMenuOpen, 
+  toggleMenu, 
+  onLogout, 
+  loading 
+}) => {
+  // Navigation principale du profil
+  const profileNavItems = [
+    {
+      to: '/profile',
+      icon: <User size={20} className="text-green-600" />,
+      label: 'Mon Profil',
+      description: 'Informations personnelles'
+    },
+    {
+      to: '/edit-profile',
+      icon: <Settings size={20} className="text-green-600" />,
+      label: 'Paramètres',
+      description: 'Modifier mes informations'
+    },
+    {
+      to: '/mes-avis',
+      icon: <Star size={20} className="text-amber-500" />,
+      label: 'Mes Avis',
+      description: 'Avis publiés'
+    },
+    {
+      to: '/mes-favoris',
+      icon: <Heart size={20} className="text-pink-500" />,
+      label: 'Mes Favoris',
+      description: 'Produits favoris'
+    },
+    {
+      to: '/historique-produits',
+      icon: <History size={20} className="text-blue-600" />,
+      label: 'Historique',
+      description: 'Produits consultés'
+    },
+    {
+      to: '/mes-tickets',
+      icon: <Receipt size={20} className="text-purple-600" />,
+      label: 'Mes Tickets',
+      description: 'Tickets de caisse'
+    },
+    {
+      to: '/abonnements',
+      icon: <Crown size={20} className="text-amber-600" />,
+      label: 'Abonnement',
+      description: 'Gérer mon plan'
     }
-  };
+  ];
 
   return (
-    <div className="relative" ref={menuRef}>
-      {/* Barre de navigation fixe en haut */}
-      <div className="bg-white rounded-lg shadow-md p-4">
-        <div className="flex items-center justify-between">
-          {/* Partie gauche: info utilisateur */}
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-              <span className="text-green-700 font-bold">
-                {currentUser?.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'U'}
-              </span>
+    <>
+      {/* Barre de navigation mobile - Mode Profil */}
+      <div className="bg-white shadow-md border-b border-green-100">
+        <div className="flex items-center justify-between py-4 px-4">
+          {/* Avatar + Info utilisateur */}
+          <div className="flex items-center">
+            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-sm font-bold mr-3">
+              {currentUser?.displayName ? 
+                currentUser.displayName.charAt(0).toUpperCase() : 
+                (currentUser?.email ? currentUser.email.charAt(0).toUpperCase() : 'U')
+              }
             </div>
             <div>
-              <div className="font-medium text-gray-800">{title}</div>
-              <div className="flex items-center space-x-2">
-                {userDetails?.status && (
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium user-badge ${getStatusColor(userDetails.status)}`}>
-                    <Award size={10} className="mr-1" />
-                    <span className="capitalize">{userDetails.status}</span>
-                  </span>
-                )}
-                <div className="flex items-center space-x-3 text-xs text-gray-500">
-                  <span className="flex items-center">
-                    <Star size={10} className="text-amber-500 mr-1" />
-                    {userDetails?.reviewCount || 0}
-                  </span>
-                  <span className="flex items-center">
-                    <Heart size={10} className="text-pink-500 mr-1" />
-                    {userDetails?.favoriteCount || 0}
-                  </span>
-                </div>
-              </div>
+              <h1 className="text-lg font-bold text-green-800">{title}</h1>
+              <p className="text-xs text-gray-600 truncate max-w-[180px]">
+                {currentUser?.displayName || currentUser?.email}
+              </p>
             </div>
           </div>
 
-          {/* Partie droite: bouton menu */}
-          <button 
+          {/* Bouton Menu Hamburger */}
+          <button
             onClick={toggleMenu}
-            className="p-2 rounded-full hover:bg-gray-100"
-            aria-label="Menu utilisateur"
+            className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-600 hover:bg-green-200 transition-colors duration-150"
+            aria-label="Menu de navigation"
           >
-            {isMenuOpen ? <X size={20} /> : <MoreVertical size={20} />}
+            {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
       </div>
 
-      {/* Menu déroulant */}
+      {/* Menu déroulant mobile - Mode Profil */}
       {isMenuOpen && (
-        <div className="absolute right-0 mt-2 w-full max-w-xs bg-white rounded-lg shadow-lg z-10 border border-gray-200 overflow-hidden profile-dropdown mobile-nav-menu">
-          <div className="py-1">
-            <Link 
-              to="/profile" 
-              className={`flex items-center px-4 py-3 ${isActivePath('/profile') ? 'bg-green-50 text-green-700' : 'hover:bg-gray-50 text-gray-700'}`}
-              onClick={toggleMenu}
-            >
-              <User size={18} className="mr-3 shrink-0" />
-              <span>Profil</span>
-            </Link>
-            
-            <Link 
-              to="/edit-profile" 
-              className={`flex items-center px-4 py-3 ${isActivePath('/edit-profile') ? 'bg-green-50 text-green-700' : 'hover:bg-gray-50 text-gray-700'}`}
-              onClick={toggleMenu}
-            >
-              <Settings size={18} className="mr-3 shrink-0" />
-              <span>Modifier profil</span>
-            </Link>
-            
-            <Link 
-              to="/change-password" 
-              className={`flex items-center px-4 py-3 ${isActivePath('/change-password') ? 'bg-green-50 text-green-700' : 'hover:bg-gray-50 text-gray-700'}`}
-              onClick={toggleMenu}
-            >
-              <KeyRound size={18} className="mr-3 shrink-0" />
-              <span>Changer mot de passe</span>
-            </Link>
-            
-            <Link 
-              to="/subscription/history" 
-              className={`flex items-center px-4 py-3 ${isActivePath('/subscription/history') ? 'bg-green-50 text-green-700' : 'hover:bg-gray-50 text-gray-700'}`}
-              onClick={toggleMenu}
-            >
-              <Calendar size={18} className="mr-3 shrink-0" />
-              <span>Abonnements</span>
-            </Link>
-            
-            <Link 
-              to="/historique-produits" 
-              className={`flex items-center px-4 py-3 ${isActivePath('/historique-produits') ? 'bg-green-50 text-green-700' : 'hover:bg-gray-50 text-gray-700'}`}
-              onClick={toggleMenu}
-            >
-              <History size={18} className="mr-3 shrink-0" />
-              <span>Historique produits</span>
-            </Link>
-            
-            <Link 
-              to="/mes-favoris" 
-              className={`flex items-center px-4 py-3 ${isActivePath('/mes-favoris') ? 'bg-green-50 text-green-700' : 'hover:bg-gray-50 text-gray-700'}`}
-              onClick={toggleMenu}
-            >
-              <Heart size={18} className="mr-3 shrink-0" />
-              <span>Mes favoris</span>
-            </Link>
-            <Link 
-              to="/mes-tickets" 
-              className={`flex items-center px-4 py-3 ${isActivePath('/mes-avis') ? 'bg-green-50 text-green-700' : 'hover:bg-gray-50 text-gray-700'}`}
-              onClick={toggleMenu}
-            >
-              <Star size={18} className="mr-3 shrink-0" />
-              <span>Mes tickets</span>
-            </Link>
-            
-              <Link 
-              to="/mes-avis" 
-              className={`flex items-center px-4 py-3 ${isActivePath('/mes-avis') ? 'bg-green-50 text-green-700' : 'hover:bg-gray-50 text-gray-700'}`}
-              onClick={toggleMenu}
-            >
-              <Star size={18} className="mr-3 shrink-0" />
-              <span>Mes avis</span>
-            </Link>
-            
-            {/* Lien d'administration - visible uniquement pour les administrateurs */}
-            {isAdmin && (
-              <Link 
-                to="/admin" 
-                className={`flex items-center px-4 py-3 ${isActivePath('/admin') ? 'bg-green-50 text-green-700' : 'hover:bg-gray-50 text-gray-700'}`}
-                onClick={toggleMenu}
-              >
-                <Shield size={18} className="mr-3 shrink-0 text-blue-600" />
-                <span className="text-blue-600 font-medium">Administration</span>
-              </Link>
-            )}
-            
-            <div className="h-px bg-gray-200 my-1"></div>
-            
-            <button 
-              onClick={() => {
-                toggleMenu();
-                onLogout();
-              }}
-              className="flex items-center px-4 py-3 text-red-600 hover:bg-red-50 w-full text-left"
-              disabled={loading}
-            >
-              <LogOut size={18} className="mr-3 shrink-0" />
-              <span>{loading ? 'Déconnexion...' : 'Se déconnecter'}</span>
-            </button>
+        <>
+          {/* Overlay */}
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-20 z-40 transition-opacity duration-200"
+            onClick={toggleMenu}
+          />
+          
+          {/* Menu contextuel */}
+          <div className="fixed top-0 right-0 w-80 max-w-[85vw] h-full bg-white shadow-xl z-50 transform transition-transform duration-200">
+            <div className="flex flex-col h-full">
+              
+              {/* En-tête du menu */}
+              <div className="bg-green-50 border-b border-green-100 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-lg font-bold mr-3">
+                      {currentUser?.displayName ? 
+                        currentUser.displayName.charAt(0).toUpperCase() : 
+                        (currentUser?.email ? currentUser.email.charAt(0).toUpperCase() : 'U')
+                      }
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-green-800">
+                        {currentUser?.displayName || 'Utilisateur'}
+                      </h2>
+                      <p className="text-sm text-green-600 truncate max-w-[160px]">
+                        {currentUser?.email}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={toggleMenu}
+                    className="w-8 h-8 rounded-lg bg-green-200 flex items-center justify-center text-green-600 hover:bg-green-300 transition-colors duration-150"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Navigation du profil */}
+              <div className="flex-1 overflow-y-auto py-2">
+                <nav className="space-y-1">
+                  {profileNavItems.map((item) => (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      onClick={toggleMenu}
+                      className="flex items-center px-4 py-3 text-gray-700 hover:bg-green-50 hover:text-green-800 transition-colors duration-150 group"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center mr-3 group-hover:bg-green-100 transition-colors duration-150">
+                        {item.icon}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium">{item.label}</div>
+                        <div className="text-xs text-gray-500">{item.description}</div>
+                      </div>
+                      <ChevronRight size={16} className="text-gray-400 group-hover:text-green-600 transition-colors duration-150" />
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+
+              {/* Section Actions */}
+              <div className="border-t border-gray-100 p-4 space-y-3">
+                
+                {/* Raccourci recherche */}
+                <Link
+                  to="/recherche-filtre"
+                  onClick={toggleMenu}
+                  className="flex items-center justify-center w-full py-2 px-4 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors duration-150 group"
+                >
+                  <ShoppingBag size={18} className="mr-2" />
+                  <span className="font-medium">Rechercher un produit</span>
+                </Link>
+
+                {/* Bouton déconnexion */}
+                <button
+                  onClick={() => {
+                    toggleMenu();
+                    onLogout();
+                  }}
+                  disabled={loading}
+                  className="flex items-center justify-center w-full py-2 px-4 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin mr-2" />
+                      <span className="font-medium">Déconnexion...</span>
+                    </>
+                  ) : (
+                    <>
+                      <LogOut size={18} className="mr-2" />
+                      <span className="font-medium">Se déconnecter</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Footer info */}
+              <div className="border-t border-gray-100 p-4 bg-gray-50">
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 mb-1">Fydo - Avis Produits</p>
+                  <Link 
+                    to="/contact" 
+                    onClick={toggleMenu}
+                    className="text-xs text-green-600 hover:text-green-800 transition-colors duration-150"
+                  >
+                    Support & Contact
+                  </Link>
+                </div>
+              </div>
+
+            </div>
           </div>
-        </div>
+        </>
       )}
-    </div>
+    </>
   );
 };
 

@@ -269,10 +269,10 @@ const Hero = () => {
                 showTitle ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
               }`}
             >
-              Des avis <span className="text-green-600 relative">
+              Des avis <span className="text-green-600 relative inline-block">
                 fiables
-                <svg className="absolute -bottom-2 left-0 w-full" height="8" viewBox="0 0 100 8">
-                  <path d="M0 7 Q25 0 50 7 T100 7" stroke="#4CAF50" strokeWidth="2" fill="none" />
+                <svg className="absolute w-full" style={{ bottom: '0em', left: '0', height: '10px' }} viewBox="0 0 100 10" preserveAspectRatio="none">
+                  <path d="M0 8 Q30 4 60 3 T100 3" stroke="#16a34a" strokeWidth="4" fill="none" vectorEffect="non-scaling-stroke" />
                 </svg>
               </span> sur vos produits du quotidien
             </h1>

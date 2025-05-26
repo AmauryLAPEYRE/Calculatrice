@@ -1,6 +1,25 @@
-// src/components/ReviewsDisplay.js
+// src/components/Review/ReviewsDisplay.js
 import React, { useState, useEffect } from 'react';
-import { Star, MessageSquare, ThumbsUp, AlertCircle, Loader, ShoppingBag, MapPin, Calendar, DollarSign, Heart } from 'lucide-react';
+import { 
+  Star, 
+  MessageSquare, 
+  ThumbsUp, 
+  AlertCircle, 
+  Loader, 
+  ShoppingBag, 
+  MapPin, 
+  Calendar, 
+  DollarSign, 
+  Heart,
+  CheckCircle,
+  TrendingUp,
+  Award,
+  Users,
+  Sparkles,
+  Shield,
+  Camera,
+  ChevronRight
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
   toggleReviewLike,
@@ -10,19 +29,6 @@ import {
 import { formatPrice } from '../../utils/formatters';
 import PriceHistory from './PriceHistory';
 
-/**
- * Composant d'affichage des avis pour un produit avec mise en page améliorée
- * @param {object} props - Propriétés du composant
- * @param {object} props.product - Données du produit
- * @param {Function} props.onAddReviewClick - Fonction appelée lorsque l'utilisateur souhaite ajouter un avis
- * @param {object} props.buttonState - État du bouton (disabled, message, tooltip)
- * @param {boolean} props.loading - Indique si les avis sont en cours de chargement
- * @param {Array} props.reviews - Liste des avis
- * @param {number} props.totalReviews - Nombre total d'avis
- * @param {number} props.averageRating - Note moyenne du produit
- * @param {number} props.verifiedReviews - Nombre d'avis vérifiés
- * @returns {JSX.Element}
- */
 const ReviewsDisplay = ({ 
   product, 
   onAddReviewClick, 
@@ -34,38 +40,32 @@ const ReviewsDisplay = ({
   verifiedReviews = 0
 }) => {
   const { currentUser, userDetails } = useAuth();
-  
-  // États locaux
   const [error, setError] = useState(null);
   const [showReceiptImage, setShowReceiptImage] = useState(null);
   const [reviewLikes, setReviewLikes] = useState({});
+  const [hoveredReview, setHoveredReview] = useState(null);
   
-  // Vérifier les likes de l'utilisateur sur les avis
+  // Vérifier les likes
   useEffect(() => {
     const checkLikes = async () => {
       if (!currentUser || !userDetails || reviews.length === 0) return;
       
       const newLikes = {};
-      
-      // Pour chaque avis, vérifier si l'utilisateur l'a liké
       for (const review of reviews) {
         const { success, hasLiked } = await checkUserLike(userDetails.id, review.id);
         if (success) {
           newLikes[review.id] = hasLiked;
         }
       }
-      
       setReviewLikes(newLikes);
     };
     
     checkLikes();
   }, [currentUser, userDetails, reviews]);
 
-  // Affichage de l'image du ticket
   const handleViewReceipt = async (reviewId) => {
     try {
       const { success, receiptUrl, error } = await getReceiptImage(reviewId);
-      
       if (success && receiptUrl) {
         setShowReceiptImage(receiptUrl);
       } else {
@@ -76,74 +76,58 @@ const ReviewsDisplay = ({
     }
   };
 
-  // Fermer la modal d'affichage du ticket
   const handleCloseReceiptModal = () => {
     setShowReceiptImage(null);
   };
   
-  // Gestion des likes sur les avis
   const handleLikeReview = async (reviewId) => {
     if (!currentUser || !userDetails) {
       setError("Vous devez être connecté pour aimer un avis");
+      setTimeout(() => setError(null), 3000);
       return;
     }
     
-    // Inverser l'état actuel du like
     const currentlyLiked = reviewLikes[reviewId] || false;
     
     try {
       const { success } = await toggleReviewLike(userDetails.id, reviewId, !currentlyLiked);
       
       if (success) {
-        // Mettre à jour l'état local des likes
         setReviewLikes(prev => ({
           ...prev,
           [reviewId]: !currentlyLiked
         }));
-        
       }
     } catch (err) {
       console.error("Erreur lors de l'ajout/retrait du like:", err);
     }
   };
     
-  // Fonction pour afficher les étoiles de notation avec précision
-  const renderPreciseStars = (rating, size = 24) => {
-    // Convertir la note en nombre
+  const renderPreciseStars = (rating, size = 20) => {
     const ratingNum = parseFloat(rating);
     
     return (
-      <div className="flex relative">
+      <div className="flex">
         {[1, 2, 3, 4, 5].map((star) => {
-          // Calculer le pourcentage de remplissage pour chaque étoile
           let fillPercentage = 0;
           
           if (ratingNum >= star) {
-            // Étoile complètement remplie
             fillPercentage = 100;
           } else if (ratingNum > star - 1) {
-            // Étoile partiellement remplie
             fillPercentage = Math.round((ratingNum - (star - 1)) * 100);
           }
           
           return (
             <div key={star} className="relative" style={{ width: size, height: size }}>
-              {/* Étoile de fond (grise) */}
-              <Star 
-                size={size} 
-                className="absolute text-gray-300"
-              />
-              
-              {/* Étoile de premier plan (jaune) avec clip-path pour le remplissage partiel */}
-              <div 
-                className="absolute overflow-hidden" 
-                style={{ width: `${fillPercentage}%`, height: '100%' }}
-              >
-                <Star 
-                  size={size} 
-                  className="text-yellow-400 fill-yellow-400"
-                />
-              </div>
+              <Star size={size} className="absolute text-gray-300" />
+              {fillPercentage > 0 && (
+                <div 
+                  className="absolute overflow-hidden" 
+                  style={{ width: `${fillPercentage}%`, height: '100%' }}
+                >
+                  <Star size={size} className="text-amber-400 fill-amber-400" />
+                </div>
+              )}
             </div>
           );
         })}
@@ -151,10 +135,8 @@ const ReviewsDisplay = ({
     );
   };
 
-  // Formater la date pour l'affichage
   const formatDate = (dateString) => {
     if (!dateString) return '';
-    
     const date = new Date(dateString);
     return date.toLocaleDateString('fr-FR', {
       year: 'numeric',
@@ -163,10 +145,8 @@ const ReviewsDisplay = ({
     });
   };
   
-  // Si aucun produit n'est sélectionné
   if (!product) return null;
   
-  // Afficher les notes spécifiques (goût, quantité, prix) si disponibles dans le produit
   const showDetailedRatings = product && (
     product.taste_rating > 0 || 
     product.quantity_rating > 0 || 
@@ -174,233 +154,391 @@ const ReviewsDisplay = ({
   );
   
   return (
-    <div>
-      {/* Résumé des avis */}
-      <div className="mb-6 p-4 bg-green-50 rounded-lg">
-        <div className="flex flex-col md:flex-row items-center justify-between">
-          <div className="flex items-center mb-4 md:mb-0">
-            <div className="text-4xl font-bold text-green-800 mr-3">{averageRating.toFixed(2)}</div>
-            <div>
-              <div className="flex mb-1">
-                {renderPreciseStars(averageRating)}
+    <div className="space-y-8">
+      {/* Hero Section des Avis */}
+      <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-white rounded-3xl p-8 shadow-xl border border-green-100">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+          {/* Statistiques principales */}
+          <div className="flex-1">
+            <div className="flex items-center gap-6 mb-6">
+              {/* Note principale GÉANTE */}
+              <div className="text-center">
+                <div className="text-6xl font-bold text-green-800 mb-2">
+                  {averageRating.toFixed(2)}
+                </div>
+                <div className="flex justify-center mb-2">
+                  {renderPreciseStars(averageRating, 28)}
+                </div>
+                <p className="text-green-600 font-medium">
+                  {totalReviews} avis au total
+                </p>
               </div>
-              <div className="flex items-center space-x-3 text-sm text-gray-600">
-                <span>
-                  Basé sur {totalReviews} avis
-                  {verifiedReviews > 0 && ` dont ${verifiedReviews} vérifiés`}
-                </span>
+              
+              {/* Badges de confiance */}
+              <div className="space-y-3">
+                {verifiedReviews > 0 && (
+                  <div className="flex items-center bg-green-100 px-4 py-2 rounded-full">
+                    <CheckCircle size={20} className="text-green-600 mr-2" />
+                    <span className="font-medium text-green-800">
+                      {verifiedReviews} avis vérifiés
+                    </span>
+                  </div>
+                )}
+                
+                {totalReviews > 10 && (
+                  <div className="flex items-center bg-amber-100 px-4 py-2 rounded-full animate-pulse">
+                    <TrendingUp size={20} className="text-amber-600 mr-2" />
+                    <span className="font-medium text-amber-800">
+                      Produit populaire
+                    </span>
+                  </div>
+                )}
                 
                 {product.total_favorites > 0 && (
-                  <div className="flex items-center text-pink-600">
-                    <Heart size={14} className="fill-pink-600 mr-1" />
-                    <span>{product.total_favorites} favoris</span>
+                  <div className="flex items-center bg-pink-100 px-4 py-2 rounded-full">
+                    <Heart size={20} className="text-pink-600 fill-pink-600 mr-2" />
+                    <span className="font-medium text-pink-800">
+                      {product.total_favorites} favoris
+                    </span>
                   </div>
                 )}
               </div>
-              
-              {/* Affichage des notes spécifiques sur une seule ligne */}
-              {showDetailedRatings && (
-                <div className="mt-3 flex flex-wrap items-center gap-4">
-                  {product.taste_rating > 0 && (
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium text-gray-700 mr-1">Goût:</span>
-                      {renderPreciseStars(product.taste_rating, 16)}
-                    </div>
-                  )}
-                  
-                  {product.quantity_rating > 0 && (
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium text-gray-700 mr-1">Quantité:</span>
-                      {renderPreciseStars(product.quantity_rating, 16)}
-                    </div>
-                  )}
-                  
-                  {product.price_rating > 0 && (
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium text-gray-700 mr-1">Prix:</span>
-                      {renderPreciseStars(product.price_rating, 16)}
-                    </div>
-                  )}
-                </div>
-              )}
-              
-{/* Par ceci: */}
-{product.average_price > 0 && (
-  <div className="mt-3">
-    <PriceHistory 
-      productCode={product.code} 
-      averagePrice={product.average_price} 
-    />
-  </div>
-)}
             </div>
+            
+            {/* Notes détaillées avec barres de progression */}
+            {showDetailedRatings && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {product.taste_rating > 0 && (
+                  <div className="bg-white rounded-xl p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Goût</span>
+                      <span className="text-lg font-bold text-green-700">
+                        {product.taste_rating.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div 
+                        className="bg-gradient-to-r from-green-400 to-green-600 h-2.5 rounded-full transition-all duration-500"
+                        style={{ width: `${(product.taste_rating / 5) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+                
+                {product.quantity_rating > 0 && (
+                  <div className="bg-white rounded-xl p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Quantité</span>
+                      <span className="text-lg font-bold text-amber-700">
+                        {product.quantity_rating.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div 
+                        className="bg-gradient-to-r from-amber-400 to-amber-600 h-2.5 rounded-full transition-all duration-500"
+                        style={{ width: `${(product.quantity_rating / 5) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+                
+                {product.price_rating > 0 && (
+                  <div className="bg-white rounded-xl p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Prix</span>
+                      <span className="text-lg font-bold text-blue-700">
+                        {product.price_rating.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div 
+                        className="bg-gradient-to-r from-blue-400 to-blue-600 h-2.5 rounded-full transition-all duration-500"
+                        style={{ width: `${(product.price_rating / 5) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Historique des prix */}
+            {product.average_price > 0 && (
+              <div className="mt-6">
+                <PriceHistory 
+                  productCode={product.code} 
+                  averagePrice={product.average_price} 
+                />
+              </div>
+            )}
           </div>
           
-          <button
-            onClick={onAddReviewClick}
-            className={`bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 flex items-center ${
-              buttonState.disabled ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-            disabled={buttonState.disabled}
-            title={buttonState.tooltip || ''}
-          >
-            <MessageSquare size={18} className="mr-2" />
-            {buttonState.message || "Donner mon avis"}
-          </button>
+          {/* CTA pour donner son avis */}
+          <div className="text-center">
+            <button
+              onClick={onAddReviewClick}
+              className={`group bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 flex items-center ${
+                buttonState.disabled ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              disabled={buttonState.disabled}
+              title={buttonState.tooltip || ''}
+            >
+              <MessageSquare size={24} className="mr-3" />
+              <span className="text-lg">{buttonState.message || "Donner mon avis"}</span>
+              <Sparkles size={16} className="ml-2 animate-pulse" />
+            </button>
+            
+            {!currentUser && (
+              <p className="text-sm text-gray-500 mt-3">
+                Connectez-vous pour partager votre expérience
+              </p>
+            )}
+          </div>
         </div>
       </div>
       
-      {/* Liste des avis */}
+      {/* Section des avis */}
       <div>
-        <h3 className="text-lg font-semibold mb-4">Avis des utilisateurs</h3>
+        <h3 className="text-2xl font-bold text-green-800 mb-6 flex items-center">
+          <MessageSquare size={28} className="mr-3 text-green-600" />
+          Avis des utilisateurs
+          {totalReviews > 0 && (
+            <span className="ml-3 text-lg font-normal text-gray-600">
+              ({totalReviews} avis)
+            </span>
+          )}
+        </h3>
         
         {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md flex items-start">
-            <AlertCircle size={18} className="mr-2 flex-shrink-0 mt-0.5" />
-            <span>{error}</span>
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start animate-fadeIn">
+            <AlertCircle size={20} className="text-red-500 mr-3 mt-0.5 flex-shrink-0" />
+            <span className="text-red-700">{error}</span>
           </div>
         )}
         
         {loading ? (
-          <div className="flex justify-center items-center py-8">
-            <Loader size={30} className="animate-spin text-green-600" />
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-green-200 rounded-full animate-pulse"></div>
+              <div className="absolute inset-0 w-16 h-16 border-4 border-green-600 rounded-full animate-spin border-t-transparent"></div>
+            </div>
+            <p className="mt-4 text-green-600 font-medium">Chargement des avis...</p>
           </div>
         ) : reviews.length > 0 ? (
-          <div className="space-y-4">
-            {reviews.map((review) => (
-              <div key={review.id} className="p-4 bg-white border border-gray-200 rounded-lg">
-                <div className="flex items-start justify-between">
-                  <div>
+          <div className="space-y-6">
+            {reviews.map((review, index) => (
+              <div 
+                key={review.id} 
+                className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.01] border border-gray-100 overflow-hidden"
+                onMouseEnter={() => setHoveredReview(review.id)}
+                onMouseLeave={() => setHoveredReview(null)}
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                {/* En-tête de l'avis */}
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6">
+                  <div className="flex items-start justify-between">
                     <div className="flex items-center">
-                      <span className="font-medium mr-2">{review.user_name}</span>
-                      {review.is_verified && (
-                        <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full flex items-center">
-                          <ShoppingBag size={12} className="mr-1" />
-                          Achat vérifié
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-500 mb-2">
-                      {formatDate(review.date)}
-                    </div>
-                    <div className="mb-2 flex items-center">
-                      {renderPreciseStars(review.average_rating, 16)}
-                      <span className="ml-2 font-medium">{parseFloat(review.average_rating).toFixed(2)}/5</span>
-                    </div>
-                  </div>
-                  <button 
-                    className={`text-gray-400 hover:text-green-600 flex items-center ${
-                      reviewLikes[review.id] ? 'text-green-600' : ''
-                    }`}
-                    onClick={() => handleLikeReview(review.id)}
-                  >
-                    <ThumbsUp size={16} className={reviewLikes[review.id] ? 'fill-green-600' : ''} />
-                    <span className="text-xs ml-1">{review.likes_count}</span>
-                  </button>
-                </div>
-                
-                {/* Détail des notes par critère - sur une seule ligne */}
-                <div className="mt-2 mb-3 flex flex-wrap gap-4">
-                  {Object.entries(review.ratings).map(([key, value]) => (
-                    <div key={key} className="flex items-center text-sm">
-                      <span className="text-gray-600 mr-1">{value.display_name}:</span>
-                      {renderPreciseStars(value.rating, 12)}
-                    </div>
-                  ))}
-                </div>
-                
-                <p className="text-gray-700 mb-3">{review.comment}</p>
-                
-                {/* Affichage des informations d'achat */}
-                {(review.purchase_date || review.purchase_price || review.store_name || review.has_location) && (
-                  <div className="mt-2 border-t border-gray-200 pt-3">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">Détails de l'achat</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                      {review.purchase_date && (
-                        <div className="flex items-center">
-                          <Calendar size={14} className="text-gray-500 mr-1" />
-                          <span>Acheté le {formatDate(review.purchase_date)}</span>
-                        </div>
-                      )}
+                      {/* Avatar utilisateur */}
+                      <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
+                        {review.user_name.charAt(0).toUpperCase()}
+                      </div>
                       
-                      {review.purchase_price && (
-                        <div className="flex items-center">
-                          <DollarSign size={14} className="text-gray-500 mr-1" />
-                          <span>Prix: {formatPrice(review.purchase_price)}</span>
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <h4 className="font-semibold text-green-800">{review.user_name}</h4>
+                          {review.is_verified && (
+                            <span className="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full flex items-center font-medium">
+                              <CheckCircle size={14} className="mr-1" />
+                              Achat vérifié
+                            </span>
+                          )}
                         </div>
-                      )}
-                      
-                      {review.store_name && (
-                        <div className="flex items-center">
-                          <ShoppingBag size={14} className="text-gray-500 mr-1" />
-                          <span>Enseigne: {review.store_name}</span>
-                        </div>
-                      )}
-                      
-                      {review.has_location && (
-                        <div className="flex items-center">
-                          <MapPin size={14} className="text-gray-500 mr-1" />
-                          <span className="text-green-600 font-medium">Localisation disponible</span>
-                        </div>
-                      )}
+                        <p className="text-sm text-gray-500 mt-1">{formatDate(review.date)}</p>
+                      </div>
                     </div>
-                  </div>
-                )}
-                
-                {/* Bouton pour voir le ticket de caisse si disponible */}
-                {review.can_show_receipt && (
-                  <div className="mt-3">
-                    <button
-                      onClick={() => handleViewReceipt(review.id)}
-                      className="text-green-600 hover:text-green-800 text-sm flex items-center"
+                    
+                    {/* Bouton like */}
+                    <button 
+                      className={`group/like p-3 rounded-full transition-all duration-300 ${
+                        reviewLikes[review.id] 
+                          ? 'bg-green-100 text-green-600' 
+                          : 'bg-gray-100 text-gray-400 hover:bg-green-50 hover:text-green-600'
+                      }`}
+                      onClick={() => handleLikeReview(review.id)}
                     >
-                      <ShoppingBag size={14} className="mr-1" />
-                      Voir le ticket de caisse
+                      <div className="flex items-center">
+                        <ThumbsUp 
+                          size={20} 
+                          className={`transition-transform group-hover/like:scale-110 ${
+                            reviewLikes[review.id] ? 'fill-green-600' : ''
+                          }`} 
+                        />
+                        {review.likes_count > 0 && (
+                          <span className="ml-2 font-medium">{review.likes_count}</span>
+                        )}
+                      </div>
                     </button>
                   </div>
-                )}
+                  
+                  {/* Note principale */}
+                  <div className="mt-4 flex items-center gap-3">
+                    {renderPreciseStars(review.average_rating, 24)}
+                    <span className="text-xl font-bold text-green-800">
+                      {parseFloat(review.average_rating).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Corps de l'avis */}
+                <div className="p-6">
+                  {/* Notes détaillées */}
+                  {Object.keys(review.ratings).length > 0 && (
+                    <div className="flex flex-wrap gap-3 mb-4">
+                      {Object.entries(review.ratings).map(([key, value]) => (
+                        <div 
+                          key={key} 
+                          className="bg-gray-50 rounded-lg px-3 py-2 flex items-center gap-2"
+                        >
+                          <span className="text-sm text-gray-600">{value.display_name}:</span>
+                          {renderPreciseStars(value.rating, 14)}
+                          <span className="text-sm font-medium text-gray-800">
+                            {value.rating}/5
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Commentaire */}
+                  <p className="text-gray-700 leading-relaxed">{review.comment}</p>
+                  
+                  {/* Informations d'achat */}
+                  {(review.purchase_date || review.purchase_price || review.store_name) && (
+                    <div className="mt-6 pt-6 border-t border-gray-100">
+                      <h5 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                        <ShoppingBag size={16} className="mr-2 text-green-600" />
+                        Détails de l'achat
+                      </h5>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {review.purchase_date && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Calendar size={14} className="text-gray-400 mr-2" />
+                            {formatDate(review.purchase_date)}
+                          </div>
+                        )}
+                        
+                        {review.purchase_price && (
+                          <div className="flex items-center text-sm">
+                            <span className="font-medium text-green-700">
+                              {formatPrice(review.purchase_price)}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {review.store_name && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <MapPin size={14} className="text-gray-400 mr-2" />
+                            {review.store_name} {review.code_postal}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Bouton ticket de caisse */}
+                  {review.can_show_receipt && (
+                    <button
+                      onClick={() => handleViewReceipt(review.id)}
+                      className="mt-4 text-green-600 hover:text-green-700 text-sm font-medium flex items-center group/receipt"
+                    >
+                      <Camera size={16} className="mr-2 group-hover/receipt:scale-110 transition-transform" />
+                      Voir le ticket de caisse
+                      <ChevronRight size={14} className="ml-1 group-hover/receipt:translate-x-1 transition-transform" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="p-6 bg-gray-50 text-center rounded-lg">
-            <MessageSquare size={40} className="mx-auto text-gray-400 mb-3" />
-            <p className="text-gray-600">Aucun avis pour le moment. Soyez le premier à donner votre avis !</p>
+          <div className="bg-gradient-to-br from-gray-50 to-white rounded-3xl p-12 text-center border border-gray-200">
+            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <MessageSquare size={32} className="text-gray-400" />
+            </div>
+            <h4 className="text-xl font-semibold text-gray-700 mb-3">
+              Aucun avis pour le moment
+            </h4>
+            <p className="text-gray-500 mb-6">
+              Soyez le premier à partager votre expérience avec ce produit !
+            </p>
+            <button
+              onClick={onAddReviewClick}
+              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 inline-flex items-center"
+              disabled={buttonState.disabled}
+            >
+              <MessageSquare size={20} className="mr-2" />
+              {buttonState.message || "Donner le premier avis"}
+            </button>
           </div>
         )}
       </div>
       
-      {/* Modal pour afficher l'image du ticket de caisse */}
+      {/* Modal ticket de caisse */}
       {showReceiptImage && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Ticket de caisse</h3>
-              <button
-                onClick={handleCloseReceiptModal}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                &times;
-              </button>
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl animate-fadeIn">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-bold text-gray-800 flex items-center">
+                  <Camera size={24} className="mr-3 text-green-600" />
+                  Ticket de caisse vérifié
+                </h3>
+                <button
+                  onClick={handleCloseReceiptModal}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
-            <div className="bg-gray-100 rounded-lg p-2 flex justify-center">
-              <img
-                src={showReceiptImage}
-                alt="Ticket de caisse"
-                className="max-h-[70vh] object-contain"
-              />
-            </div>
-            <div className="mt-4 text-center">
-              <button
-                onClick={handleCloseReceiptModal}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-              >
-                Fermer
-              </button>
+            <div className="p-6">
+              <div className="bg-gray-100 rounded-2xl p-4 flex justify-center max-h-[70vh] overflow-auto">
+                <img
+                  src={showReceiptImage}
+                  alt="Ticket de caisse"
+                  className="max-w-full h-auto rounded-lg shadow-lg"
+                />
+              </div>
+              <div className="mt-6 flex justify-center">
+                <button
+                  onClick={handleCloseReceiptModal}
+                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  Fermer
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+      
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        .animate-fadeIn {
+          animation: fadeIn 0.5s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 };

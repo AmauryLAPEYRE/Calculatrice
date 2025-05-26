@@ -1,12 +1,9 @@
 // src/components/product/NameSearchForm.js
 import React, { useState } from 'react';
-import { Info, AlertCircle } from 'lucide-react';
+import { Search, Filter, AlertCircle, Plus, X, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import AdvancedSearchFilters from '../AdvancedSearchFilters';
 import { Link } from 'react-router-dom';
 
-/**
- * Formulaire de recherche par nom avec filtres
- */
 const NameSearchForm = ({
   productName,
   setProductName,
@@ -18,24 +15,22 @@ const NameSearchForm = ({
   isAuthorized,
   loading
 }) => {
-  // État pour gérer l'affichage des alertes d'autorisation
   const [alertMessage, setAlertMessage] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
 
-  // Fonction sécurisée pour vérifier l'autorisation
   const checkAuthorization = (action) => {
     if (typeof isAuthorized !== 'function') {
-      return true; // Par défaut, autoriser si ce n'est pas une fonction
+      return true;
     }
     
     try {
       return isAuthorized(action);
     } catch (error) {
       console.error('Erreur lors de l\'appel à isAuthorized:', error);
-      return true; // En cas d'erreur, autoriser par défaut
+      return true;
     }
   };
 
-  // Wrapper sécurisé pour onSearch
   const handleSearch = () => {
     if (!checkAuthorization('searchName')) {
       showAuthorizationAlert();
@@ -51,58 +46,45 @@ const NameSearchForm = ({
     }
   };
 
-  // Afficher un message d'alerte pour les fonctions non autorisées
   const showAuthorizationAlert = () => {
     setAlertMessage(
       "Vous avez atteint votre limite quotidienne de recherches par nom. Passez à un abonnement supérieur pour continuer."
     );
     
-    // Masquer l'alerte après 5 secondes
     setTimeout(() => {
       setAlertMessage(null);
     }, 5000);
   };
   
-  // Réinitialiser l'alerte
   const dismissAlert = () => {
     setAlertMessage(null);
   };
 
-  // Gestionnaire pour la touche Entrée
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       handleSearch();
     }
   };
   
-  // Déstructurer searchFilters en toute sécurité
-  const safeSearchFilters = searchFilters || { withIngredients: [], withoutIngredients: [] };
-  const withIngredients = Array.isArray(safeSearchFilters.withIngredients) 
-    ? safeSearchFilters.withIngredients 
-    : [];
-  const withoutIngredients = Array.isArray(safeSearchFilters.withoutIngredients) 
-    ? safeSearchFilters.withoutIngredients 
-    : [];
-  
-  // Vérifier si le bouton doit être désactivé
-  const isButtonDisabled = loading || !checkAuthorization('searchName');
-  
-  // Message d'alerte
+  // Message d'alerte moderne
   const alertComponent = alertMessage && (
-    <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+    <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl shadow-sm animate-fadeIn">
       <div className="flex items-start">
-        <AlertCircle size={16} className="text-amber-500 mr-2 mt-1 flex-shrink-0" />
-        <div className="flex-1">
-          <p className="text-sm text-amber-800">{alertMessage}</p>
-          <div className="mt-2 flex space-x-2">
+        <div className="flex-shrink-0 w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+          <AlertCircle size={20} className="text-amber-600" />
+        </div>
+        <div className="ml-3 flex-1">
+          <p className="text-sm font-medium text-amber-800">{alertMessage}</p>
+          <div className="mt-3 flex space-x-3">
             <Link
               to="/abonnements"
-              className="px-3 py-1 bg-amber-500 text-white text-xs rounded hover:bg-amber-600 transition-colors"
+              className="inline-flex items-center px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-full hover:bg-amber-700 transition-all duration-300 shadow-sm hover:shadow-md"
             >
+              <Sparkles size={14} className="mr-1.5" />
               S'abonner
             </Link>
             <button 
-              className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300 transition-colors"
+              className="inline-flex items-center px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-full hover:bg-gray-50 transition-all duration-300 border border-gray-200"
               onClick={dismissAlert}
             >
               Fermer
@@ -114,95 +96,95 @@ const NameSearchForm = ({
   );
   
   return (
-    <div className="mb-6">
+    <div className="space-y-6">
       {alertComponent}
       
-      {/* Version desktop */}
-      {!isMobile && (
-        <div className="flex items-center space-x-2 mb-4">
-          <input
-            type="text"
-            className={`flex-1 px-4 py-2 border ${alertMessage ? 'border-amber-400 ring-1 ring-amber-400' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-green-500`}
-            placeholder="Saisissez le nom du produit (ex: macaroni, yaourt...)"
-            value={productName}
-            onChange={(e) => setProductName(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-          <button
-            className={`px-4 py-2 ${isButtonDisabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} text-white rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-center min-w-[100px]`}
-            onClick={handleSearch}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Recherche...
-              </>
-            ) : 'Rechercher'}
-          </button>
-        </div>
-      )}
-      
-      {/* Version mobile */}
-      {isMobile && (
-        <div className="space-y-2 mb-4">
-          <input
-            type="text"
-            className={`w-full px-4 py-2 border ${alertMessage ? 'border-amber-400 ring-1 ring-amber-400' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-green-500`}
-            placeholder="Saisissez le nom du produit (ex: macaroni, yaourt...)"
-            value={productName}
-            onChange={(e) => setProductName(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-          <button
-            className={`w-full px-4 py-2 ${isButtonDisabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} text-white rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-center`}
-            onClick={handleSearch}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Recherche...
-              </>
-            ) : 'Rechercher'}
-          </button>
-        </div>
-      )}
-      
-      {/* Filtres avancés */}
-      <AdvancedSearchFilters onApplyFilters={(filters) => {
-        if (typeof onApplyFilters === 'function') {
-          try {
-            onApplyFilters(filters);
-          } catch (error) {
-            console.error('Erreur lors de l\'appel à onApplyFilters:', error);
-          }
-        }
-      }} />
-      
-      {/* Affichage des filtres actifs */}
-      {filtersApplied && (
-        <div className="bg-blue-50 rounded-md p-3 mt-2 flex items-start">
-          <Info size={18} className="text-blue-500 mr-2 mt-1 flex-shrink-0" />
-          <div className="text-sm text-blue-700">
-            <p className="font-medium">Filtres actifs :</p>
-            <ul className="mt-1 ml-4 list-disc">
-              {withIngredients.length > 0 && (
-                <li>AVEC : {withIngredients.join(', ')}</li>
-              )}
-              {withoutIngredients.length > 0 && (
-                <li>SANS : {withoutIngredients.join(', ')}</li>
-              )}
-            </ul>
+      {/* Barre de recherche moderne */}
+      <div className="relative">
+        <div className="flex items-center bg-white rounded-2xl shadow-lg border border-green-100 overflow-hidden transition-all duration-300 hover:shadow-xl">
+          <div className="flex-1 relative">
+            <Search size={20} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              className="w-full pl-12 pr-4 py-4 text-lg focus:outline-none"
+              placeholder="Saisissez le nom du produit (ex: macaroni, yaourt...)"
+              value={productName}
+              onChange={(e) => setProductName(e.target.value)}
+              onKeyDown={handleKeyDown}
+            />
+          </div>
+          
+          <div className="flex items-center pr-2">
+            <button
+              className={`px-6 py-3 ${loading || !checkAuthorization('searchName') ? 'bg-gray-300 cursor-not-allowed' : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800'} text-white rounded-xl font-medium transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-[1.02] flex items-center`}
+              onClick={handleSearch}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Recherche...
+                </>
+              ) : 'Rechercher'}
+            </button>
           </div>
         </div>
+      </div>
+      
+      {/* Bouton filtres avec indicateur */}
+      <div className="flex justify-center">
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`inline-flex items-center px-5 py-2.5 ${showFilters ? 'bg-green-600 text-white' : 'bg-white text-green-700 border border-green-200'} rounded-full font-medium transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-[1.02]`}
+        >
+          <Filter size={18} className="mr-2" />
+          {showFilters ? 'Masquer' : 'Afficher'} les filtres avancés
+          {filtersApplied && (
+            <span className="ml-2 w-2 h-2 bg-amber-400 rounded-full animate-pulse"></span>
+          )}
+          {showFilters ? <ChevronUp size={18} className="ml-2" /> : <ChevronDown size={18} className="ml-2" />}
+        </button>
+      </div>
+      
+      {/* Section des filtres avec animation */}
+      {showFilters && (
+        <div className="animate-slideDown">
+          <AdvancedSearchFilters 
+            onApplyFilters={(filters) => {
+              if (typeof onApplyFilters === 'function') {
+                try {
+                  onApplyFilters(filters);
+                } catch (error) {
+                  console.error('Erreur lors de l\'appel à onApplyFilters:', error);
+                }
+              }
+            }} 
+          />
+        </div>
       )}
+      
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes slideDown {
+          from { opacity: 0; max-height: 0; }
+          to { opacity: 1; max-height: 500px; }
+        }
+        
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out forwards;
+        }
+        
+        .animate-slideDown {
+          animation: slideDown 0.3s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 };

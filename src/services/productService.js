@@ -1,6 +1,5 @@
 // src/services/productService.js
 import { supabase } from '../supabaseClient';
-
 /**
  * Ajoute une entrée à l'historique de navigation pour un utilisateur
  * @param {string} userId - ID de l'utilisateur

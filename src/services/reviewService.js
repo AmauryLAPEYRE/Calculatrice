@@ -55,13 +55,20 @@ export const getProductReviews = async (productCode, limit = 10, offset = 0) => 
       throw productError;
     }
     
-    // Récupérer les avis avec les notes par critère
+  // Récupérer les avis avec les notes par critère ET les informations des enseignes
     const { data: reviews, count, error } = await supabase
       .from('product_reviews')
       .select(`
         *,
         users!inner (id, display_name),
-        review_ratings (id, criteria_id, rating)
+        review_ratings (id, criteria_id, rating),
+        receipts!product_reviews_receipt_id_fkey (
+          id,
+          enseigne_id,
+          enseignes!receipts_enseigne_id_fkey (
+            code_postal
+          )
+        )
       `, { count: 'exact' })
       .eq('product_code', productCode)
       .in('status', ['approved', 'approved_auto'])
@@ -110,6 +117,11 @@ export const getProductReviews = async (productCode, limit = 10, offset = 0) => 
         }
       });
       
+      // Extraire le code postal depuis les données de l'enseigne
+      let codePostal = null;
+      if (review.receipts && review.receipts.enseignes) {
+        codePostal = review.receipts.enseignes.code_postal;
+      }
       // Inclure les nouveaux champs dans le résultat formaté
       return {
         id: review.id,
@@ -124,6 +136,7 @@ export const getProductReviews = async (productCode, limit = 10, offset = 0) => 
         purchase_price: review.purchase_price,
         purchase_date: review.purchase_date,
         store_name: review.store_name,
+        code_postal: codePostal, // NOUVEAU : Ajout du code postal
         // Ne pas renvoyer les coordonnées précises par défaut pour des raisons de confidentialité
         has_location: !!review.purchase_location,
         // Ne pas envoyer le ticket si l'utilisateur n'a pas autorisé le partage
@@ -386,7 +399,8 @@ export const updateProductStats = async (productCode) => {
         quantity_rating,
         price_rating,
         purchase_price,
-        is_verified
+        is_verified,
+        review_source
       `)
       .eq('product_code', productCode)
       .in('status', ['approved', 'approved_auto']);
@@ -450,21 +464,46 @@ export const checkUserReview = async (userId, productCode) => {
     
     const { data, error } = await supabase
       .from('product_reviews')
-      .select('id, status')
+      .select('id, status, creation_date','review_source')  // Ajout de creation_date
       .eq('user_id', userId)
       .eq('product_code', productCode)
-      .single();
+      .order('creation_date', { ascending: false })  // Tri décroissant par date de création
+      .limit(1)  // Prendre seulement le plus récent
+      .maybeSingle();  // Remplace .single() pour éviter l'erreur si aucun résultat
       
-    if (error && error.code !== 'PGRST116') { // PGRST116 = "No rows returned"
+    if (error) {
       throw error;
     }
     
+    // Si aucun avis trouvé
+    if (!data) {
+      return { 
+        success: true, 
+        hasReviewed: false,
+        reviewStatus: null,
+        reviewId: null
+      };
+    }
+    
+    // Calculer la date d'il y a 1 mois
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    
+    // Convertir la date de création en objet Date
+    const creationDate = new Date(data.creation_date);
+    
+    // Vérifier si l'avis a moins d'un mois
+    const isRecentReview = creationDate > oneMonthAgo;
+    
     return { 
       success: true, 
-      hasReviewed: !!data,
-      reviewStatus: data?.status || null,
-      reviewId: data?.id || null
+      hasReviewed: isRecentReview,  // True seulement si l'avis a moins d'un mois
+      reviewStatus: data.status,
+      reviewId: data.id,
+      reviewDate: data.creation_date,  // Optionnel : retourner la date pour information
+      isRecentReview: isRecentReview   // Optionnel : pour distinguer l'existence de la récence
     };
+    
   } catch (error) {
     console.error("Erreur lors de la vérification de l'avis:", error.message);
     return { success: false, error: error.message };
@@ -673,7 +712,7 @@ export const getReceiptImage = async (reviewId) => {
     // Vérifier si l'avis autorise le partage du ticket
     const { data: review, error: reviewError } = await supabase
       .from('product_reviews')
-      .select('receipt_id, authorize_receipt_sharing, user_id')
+      .select('receipt_id, authorize_receipt_sharing, user_id','review_source')
       .eq('id', reviewId)
       .single();
       
@@ -721,7 +760,7 @@ export const canUserLeaveReview = async (userId, productCode) => {
     // Récupérer la date du dernier avis laissé par l'utilisateur pour ce produit
     const { data, error } = await supabase
       .from('product_reviews')
-      .select('creation_date')
+      .select('creation_date','review_source')
       .eq('user_id', userId)
       .eq('product_code', productCode)
       .neq('status','rejected')
@@ -821,7 +860,8 @@ export const getProductRecentPrices = async (productCode, limit = 10) => {
         average_rating,
         users(display_name),
         receipt_id,
-        receipts!product_reviews_receipt_id_fkey(enseigne_id)
+        receipts!product_reviews_receipt_id_fkey(enseigne_id),
+        review_source'
       `)
       .eq('product_code', productCode)
       .in('status', ['approved', 'approved_auto'])

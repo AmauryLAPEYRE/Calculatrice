@@ -24,7 +24,9 @@ import {
   TrendingUp,
   Shield,
   Zap,
-  Crown
+  Crown,
+  Camera,
+  ScanLine
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import fydoLogo from '../assets/images/Fydo-logo.png';
@@ -99,43 +101,37 @@ const Header = () => {
            (path !== '/' && location.pathname.startsWith(path));
   };
 
-  // Obtenir le badge et l'icône selon le statut
-  const getBadgeInfo = (status) => {
-    let color, bg, icon, glow;
+  // Fonction pour gérer les clics sur les liens de navigation
+  const handleNavClick = (path, e) => {
+    e.preventDefault();
     
-    switch(status?.toLowerCase()) {
-      case 'bronze':
-        color = 'text-amber-800';
-        bg = 'bg-gradient-to-r from-amber-400 to-amber-600';
-        icon = <Award size={12} />;
-        glow = 'shadow-amber-400/50';
-        break;
-      case 'argent': case 'silver':
-        color = 'text-gray-700';
-        bg = 'bg-gradient-to-r from-gray-300 to-gray-500';
-        icon = <Award size={12} />;
-        glow = 'shadow-gray-400/50';
-        break;
-      case 'or': case 'gold':
-        color = 'text-amber-800';
-        bg = 'bg-gradient-to-r from-yellow-400 to-yellow-600';
-        icon = <Award size={12} />;
-        glow = 'shadow-yellow-400/50';
-        break;
-      case 'diamant': case 'diamond':
-        color = 'text-blue-700';
-        bg = 'bg-gradient-to-r from-blue-400 to-blue-600';
-        icon = <Award size={12} />;
-        glow = 'shadow-blue-400/50';
-        break;
-      default:
-        color = 'text-amber-800';
-        bg = 'bg-gradient-to-r from-amber-400 to-amber-600';
-        icon = <Award size={12} />;
-        glow = 'shadow-amber-400/50';
+    // Fermer le menu mobile si ouvert
+    setMobileMenuOpen(false);
+    setDropdownOpen(false);
+    
+    // Si on est déjà sur la page, forcer le refresh ou scroll vers le haut
+    if (isActivePath(path)) {
+      // Scroll vers le haut de la page
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      // Alternative : forcer la navigation pour refresh la page
+      // window.location.href = path;
+    } else {
+      // Navigation normale vers la nouvelle page
+      navigate(path);
     }
+  };
+
+  // Fonction spéciale pour les liens du dropdown
+  const handleDropdownClick = (path, e) => {
+    e.preventDefault();
+    setDropdownOpen(false);
     
-    return { color, bg, icon, glow };
+    if (isActivePath(path)) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      navigate(path);
+    }
   };
 
   // Navigation items avec animations
@@ -193,11 +189,12 @@ const Header = () => {
           <div className="hidden lg:flex items-center space-x-1">
             {navItems.map((item) => (
               <div key={item.path} className="relative">
-                <Link
-                  to={item.path}
+                <a
+                  href={item.path}
+                  onClick={(e) => handleNavClick(item.path, e)}
                   onMouseEnter={() => setHoveredNav(item.path)}
                   onMouseLeave={() => setHoveredNav(null)}
-                  className={`relative flex items-center text-sm font-medium px-3 py-2 rounded-xl transition-all duration-300 transform ${
+                  className={`relative flex items-center text-sm font-medium px-3 py-2 rounded-xl transition-all duration-300 transform cursor-pointer ${
                     isActivePath(item.path)
                       ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg scale-105'
                       : item.highlight
@@ -212,6 +209,13 @@ const Header = () => {
                   </span>
                   {item.label}
                   
+                  {/* Tooltip pour indiquer l'action sur page active */}
+                  {isActivePath(item.path) && (
+                    <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
+                      Cliquez pour retourner en haut
+                    </span>
+                  )}
+                  
                   {/* Effet de brillance au hover */}
                   {item.highlight && !isActivePath(item.path) && (
                     <span className="absolute inset-0 rounded-xl overflow-hidden">
@@ -225,17 +229,18 @@ const Header = () => {
                   {isActivePath(item.path) && (
                     <span className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-white rounded-full animate-ping"></span>
                   )}
-                </Link>
+                </a>
               </div>
             ))}
             
             {/* Bouton Challenges avec animation spéciale */}
             {currentUser && (
               <div className="mx-2">
-                <Link 
-                  to="/challenges"
+                <a 
+                  href="/challenges"
+                  onClick={(e) => handleNavClick('/challenges', e)}
                   aria-label="Challenges"
-                  className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-300 transform hover:scale-110 group ${
+                  className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-300 transform hover:scale-110 group cursor-pointer ${
                     isChallengesPage 
                       ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg scale-105'
                       : 'bg-gradient-to-r from-amber-100 to-amber-200 text-amber-700 hover:from-amber-200 hover:to-amber-300 hover:shadow-lg'
@@ -259,7 +264,7 @@ const Header = () => {
                     <span className="absolute bottom-0 right-1/4 w-1 h-1 bg-amber-400 rounded-full animate-float-2"></span>
                     <span className="absolute top-1/2 right-0 w-1 h-1 bg-amber-500 rounded-full animate-float-3"></span>
                   </span>
-                </Link>
+                </a>
               </div>
             )}
           </div>
@@ -289,29 +294,20 @@ const Header = () => {
                       {currentUser.displayName || 'Utilisateur'}
                     </span>
                     
-                    {/* Badges et stats avec micro-animations */}
-                    <div className="flex items-center space-x-2">
-                      {/* Badge de statut avec effet glow */}
-                      {userDetails?.status && (
-                        <div className="relative">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold text-white ${getBadgeInfo(userDetails.status).bg} shadow-md ${getBadgeInfo(userDetails.status).glow} transition-all duration-300 hover:shadow-lg`}>
-                            <span className="mr-0.5">{getBadgeInfo(userDetails.status).icon}</span>
-                            <span className="capitalize">{userDetails.status}</span>
-                          </span>
-                        </div>
-                      )}
-                      
-                      {/* Stats avec animations au hover */}
-                      <div className="flex items-center space-x-2">
-                        <span className="flex items-center text-xs text-green-700 group-hover:scale-110 transition-transform duration-300">
-                          <Star size={12} className="text-amber-500 mr-0.5 fill-amber-500" />
-                          {userDetails?.reviewCount || 0}
-                        </span>
-                        <span className="flex items-center text-xs text-green-700 group-hover:scale-110 transition-transform duration-300">
-                          <Heart size={12} className="text-pink-500 mr-0.5 fill-pink-500" />
-                          {userDetails?.favoriteCount || 0}
-                        </span>
-                      </div>
+                    {/* Stats avec animations au hover */}
+                    <div className="flex items-center space-x-3">
+                      <span className="flex items-center text-xs text-green-700 group-hover:scale-110 transition-transform duration-300">
+                        <Camera size={12} className="text-sky-500 mr-0.5" />
+                        {userDetails?.scanCount || 0}
+                      </span>
+                      <span className="flex items-center text-xs text-green-700 group-hover:scale-110 transition-transform duration-300">
+                        <Star size={12} className="text-amber-500 mr-0.5 fill-amber-500" />
+                        {userDetails?.reviewCount || 0}
+                      </span>
+                      <span className="flex items-center text-xs text-green-700 group-hover:scale-110 transition-transform duration-300">
+                        <Heart size={12} className="text-pink-500 mr-0.5 fill-pink-500" />
+                        {userDetails?.favoriteCount || 0}
+                      </span>
                       
                       {/* Badge Premium si applicable */}
                       {subscriptionPlan?.name && subscriptionPlan.name !== 'Gratuit' && (
@@ -339,29 +335,29 @@ const Header = () => {
                     </div>
                     
                     <div className="py-2">
-                      <DropdownLink to="/profile" icon={<User size={18} />} badge={subscriptionPlan?.name !== 'Gratuit' ? 'PRO' : null}>
+                      <DropdownLink to="/profile" icon={<User size={18} />} badge={subscriptionPlan?.name !== 'Gratuit' ? 'PRO' : null} onClick={handleDropdownClick}>
                         Mon profil
                       </DropdownLink>
                       
-                      <DropdownLink to="/historique-produits" icon={<Clock size={18} />}>
+                      <DropdownLink to="/historique-produits" icon={<Clock size={18} />} onClick={handleDropdownClick}>
                         Historique
                       </DropdownLink>
                     </div>
                     
                     <div className="py-2">
-                      <DropdownLink to="/mes-favoris" icon={<Heart size={18} />} count={userDetails?.favoriteCount}>
+                      <DropdownLink to="/mes-favoris" icon={<Heart size={18} />} count={userDetails?.favoriteCount} onClick={handleDropdownClick}>
                         Mes favoris
                       </DropdownLink>
                       
-                      <DropdownLink to="/mes-tickets" icon={<Receipt size={18} />}>
+                      <DropdownLink to="/mes-tickets" icon={<Receipt size={18} />} onClick={handleDropdownClick}>
                         Mes tickets
                       </DropdownLink>
                       
-                      <DropdownLink to="/mes-avis" icon={<MessageSquare size={18} />} count={userDetails?.reviewCount}>
+                      <DropdownLink to="/mes-avis" icon={<MessageSquare size={18} />} count={userDetails?.reviewCount} onClick={handleDropdownClick}>
                         Mes avis
                       </DropdownLink>
                       
-                      <DropdownLink to="/challenges" icon={<Trophy size={18} />} special badge="NEW">
+                      <DropdownLink to="/challenges" icon={<Trophy size={18} />} special badge="NEW" onClick={handleDropdownClick}>
                         Challenges
                       </DropdownLink>
                     </div>
@@ -402,11 +398,11 @@ const Header = () => {
             )}
           </div>
 
-          {/* Menu mobile amélioré */}
+          {/* Menu mobile avec meilleure gestion de l'espace */}
           {mobileMenuOpen && (
             <div 
               ref={mobileMenuRef} 
-              className="lg:hidden absolute top-16 inset-x-0 z-50 bg-white shadow-xl rounded-b-2xl animate-slideDown"
+              className="lg:hidden fixed inset-x-0 top-16 z-50 max-h-[calc(100vh-4rem)] overflow-y-auto bg-white shadow-xl rounded-b-2xl animate-slideDown"
             >
               <div className="p-4 space-y-4 divide-y divide-gray-100">
                 {/* Menu navigation mobile avec animations */}
@@ -419,6 +415,7 @@ const Header = () => {
                       active={isActivePath(item.path)}
                       highlight={item.highlight}
                       delay={index * 50}
+                      onClick={handleNavClick}
                     >
                       {item.label}
                     </MobileNavLink>
@@ -432,6 +429,7 @@ const Header = () => {
                       active={isActivePath('/challenges')}
                       specialStyle="bg-gradient-to-r from-amber-100 to-amber-200 text-amber-800 border border-amber-300"
                       delay={navItems.length * 50}
+                      onClick={handleNavClick}
                     >
                       Challenges
                       <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold animate-pulse">
@@ -457,16 +455,12 @@ const Header = () => {
                             </div>
                             
                             <div className="flex items-center space-x-2 mt-1">
-                              {/* Badge de statut mobile */}
-                              {userDetails?.status && (
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold text-white ${getBadgeInfo(userDetails.status).bg} shadow-sm`}>
-                                  {getBadgeInfo(userDetails.status).icon}
-                                  <span className="ml-0.5 capitalize">{userDetails.status}</span>
-                                </span>
-                              )}
-                              
                               {/* Stats mobile */}
                               <div className="flex items-center space-x-2">
+                                <span className="flex items-center text-xs text-green-700">
+                                  <Camera size={12} className="text-sky-500 mr-0.5" />
+                                  {userDetails?.scanCount || 0}
+                                </span>
                                 <span className="flex items-center text-xs text-green-700">
                                   <Star size={12} className="text-amber-500 mr-0.5 fill-amber-500" />
                                   {userDetails?.reviewCount || 0}
@@ -483,15 +477,15 @@ const Header = () => {
                       
                       {/* Liens profil mobile avec animations */}
                       <div className="grid grid-cols-1 gap-1">
-                        <MobileNavLink to="/profile" icon={<User size={18} />} delay={0}>
+                        <MobileNavLink to="/profile" icon={<User size={18} />} delay={0} onClick={handleNavClick}>
                           Mon profil
                         </MobileNavLink>
                         
-                        <MobileNavLink to="/historique-produits" icon={<Clock size={18} />} delay={50}>
+                        <MobileNavLink to="/historique-produits" icon={<Clock size={18} />} delay={50} onClick={handleNavClick}>
                           Historique
                         </MobileNavLink>
                         
-                        <MobileNavLink to="/mes-favoris" icon={<Heart size={18} />} delay={100}>
+                        <MobileNavLink to="/mes-favoris" icon={<Heart size={18} />} delay={100} onClick={handleNavClick}>
                           Mes favoris
                           {userDetails?.favoriteCount > 0 && (
                             <span className="ml-auto bg-pink-100 text-pink-600 text-xs px-2 py-0.5 rounded-full font-medium">
@@ -500,11 +494,11 @@ const Header = () => {
                           )}
                         </MobileNavLink>
 
-                        <MobileNavLink to="/mes-tickets" icon={<Receipt size={18} />} delay={150}>
+                        <MobileNavLink to="/mes-tickets" icon={<Receipt size={18} />} delay={150} onClick={handleNavClick}>
                           Mes tickets
                         </MobileNavLink>
                         
-                        <MobileNavLink to="/mes-avis" icon={<MessageSquare size={18} />} delay={200}>
+                        <MobileNavLink to="/mes-avis" icon={<MessageSquare size={18} />} delay={200} onClick={handleNavClick}>
                           Mes avis
                           {userDetails?.reviewCount > 0 && (
                             <span className="ml-auto bg-green-100 text-green-600 text-xs px-2 py-0.5 rounded-full font-medium">
@@ -528,12 +522,14 @@ const Header = () => {
                       <Link 
                         to="/login" 
                         className="w-full text-center text-sm text-green-800 hover:bg-green-50 py-2.5 px-3 rounded-xl transition-all duration-300"
+                        onClick={() => setMobileMenuOpen(false)}
                       >
                         Connexion
                       </Link>
                       <Link 
                         to="/signup" 
                         className="w-full text-center text-sm bg-gradient-to-r from-green-600 to-green-700 text-white py-2.5 px-3 rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 shadow-md hover:shadow-lg relative overflow-hidden group"
+                        onClick={() => setMobileMenuOpen(false)}
                       >
                         <span className="relative z-10">Inscription gratuite</span>
                         <span className="absolute inset-0 bg-gradient-to-r from-orange-500 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl"></span>
@@ -676,18 +672,24 @@ const Header = () => {
 };
 
 // Composant pour les liens du menu déroulant avec badges et animations
-const DropdownLink = ({ to, children, icon, special, count, badge }) => {
+const DropdownLink = ({ to, children, icon, special, count, badge, onClick }) => {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+  
   return (
-    <Link
-      to={to}
-      className={`flex items-center justify-between px-4 py-2.5 text-sm transition-all duration-200 ${
+    <a
+      href={to}
+      onClick={(e) => onClick(to, e)}
+      className={`flex items-center justify-between px-4 py-2.5 text-sm transition-all duration-200 cursor-pointer ${
         special 
           ? 'text-amber-700 hover:bg-gradient-to-r hover:from-amber-50 hover:to-amber-100' 
           : 'text-gray-700 hover:bg-gray-50'
-      } group`}
+      } group ${isActive ? 'bg-green-50 text-green-700' : ''}`}
     >
       <div className="flex items-center">
-        <span className={`mr-3 transition-transform duration-200 group-hover:scale-110 ${special ? 'text-amber-600' : 'text-gray-500'}`}>
+        <span className={`mr-3 transition-transform duration-200 group-hover:scale-110 ${
+          special ? 'text-amber-600' : isActive ? 'text-green-600' : 'text-gray-500'
+        }`}>
           {icon}
         </span>
         {children}
@@ -710,28 +712,29 @@ const DropdownLink = ({ to, children, icon, special, count, badge }) => {
           </span>
         )}
       </div>
-    </Link>
+    </a>
   );
 };
 
 // Composant pour les liens du menu mobile avec animations décalées
-const MobileNavLink = ({ to, children, icon, active, specialStyle, highlight, delay = 0 }) => {
-  const baseStyle = "flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-300 animate-fadeIn";
-  const defaultStyle = specialStyle || (highlight ? "bg-orange-50 text-orange-700" : "text-green-800");
+const MobileNavLink = ({ to, children, icon, active, specialStyle, highlight, delay = 0, onClick }) => {
+  const baseStyle = "flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-300 animate-fadeIn cursor-pointer";
+  const defaultStyle = specialStyle || (highlight ? "bg-orange-50 text-orange-700 hover:bg-orange-100" : "text-green-800 hover:bg-green-50");
   
   return (
-    <Link
-      to={to}
+    <a
+      href={to}
+      onClick={(e) => onClick(to, e)}
       className={`${baseStyle} ${active 
         ? `bg-gradient-to-r from-green-600 to-green-700 text-white shadow-md` 
-        : `hover:bg-green-50 ${defaultStyle}`}`}
+        : defaultStyle}`}
       style={{ animationDelay: `${delay}ms` }}
     >
       <div className="flex items-center">
         <span className="mr-3">{icon}</span>
         {children}
       </div>
-    </Link>
+    </a>
   );
 };
 

@@ -475,6 +475,7 @@ export const updateProductRatings = async (productCode) => {
         .from('product_reviews')
         .select('average_rating')
         .eq('product_code', productCode)
+        .eq('review_source','user')
         .in('status', ['approved', 'approved_auto']);
         
       if (reviewsError) throw reviewsError;

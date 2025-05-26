@@ -1,5 +1,6 @@
 // src/services/receiptService.js
 import { supabase } from '../supabaseClient';
+
 /**
  * Récupère les articles d'un ticket de caisse depuis la base de données
  * @param {string} receiptId - ID du ticket de caisse
@@ -41,6 +42,57 @@ export const getReceiptItems = async (receiptId) => {
     };
   }
 };
+
+/**
+ * Récupère tous les tickets d'un utilisateur
+ * @param {string} userId - ID de l'utilisateur
+ * @returns {Promise<object>} - Résultat avec la liste des tickets
+ */
+export const getUserReceipts = async (userId) => {
+  try {
+    console.log("📋 Récupération des tickets pour l'utilisateur:", userId);
+    
+    if (!userId) {
+      throw new Error("ID utilisateur requis");
+    }
+    
+    const { data, error } = await supabase
+      .from('receipts')
+      .select(`
+        id,
+        store_name,
+        upload_date,
+        firebase_url,
+        total_ttc,
+        receipt_date,
+        enseignes (
+          nom,
+          adresse,
+          ville,
+          code_postal
+        )
+      `)
+      .eq('user_id', userId)
+      .order('upload_date', { ascending: false });
+      
+    if (error) throw error;
+    
+    console.log(`✅ ${data?.length || 0} tickets récupérés`);
+    
+    return { 
+      success: true, 
+      receipts: data || [] 
+    };
+  } catch (error) {
+    console.error("❌ Erreur lors de la récupération des tickets:", error.message);
+    return { 
+      success: false, 
+      error: error.message,
+      receipts: [] 
+    };
+  }
+};
+
 /**
  * Vérifie si un ticket existe déjà pour cet utilisateur
  * @param {string} userId - ID de l'utilisateur 

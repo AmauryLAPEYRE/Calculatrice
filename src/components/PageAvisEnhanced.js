@@ -1,72 +1,68 @@
-// src/components/PageAvisEnhanced.js - Version modifiée avec le hook personnalisé
+// src/components/PageAvisEnhanced.js
 import React, { useState } from 'react';
 import ReviewsDisplay from './Review/ReviewsDisplay';
 import ReviewForm from './Review/ReviewForm';
+//import ReviewForm from './Review/ReviewForm/index';
 import useProductReviews from '../hooks/useProductReviews';
 import { formatDate } from '../utils/formatters';
+import { AlertCircle } from 'lucide-react';
 
-/**
- * Composant amélioré pour afficher et gérer les avis produits
- * Utilise le hook personnalisé useProductReviews
- * @param {object} product - Données du produit
- * @returns {JSX.Element}
- */
 const PageAvisEnhanced = ({ product }) => {
   const [showAddReview, setShowAddReview] = useState(false);
+  const [error, setError] = useState(null);
   
   const {
     loading,
-    error,
     reviews,
     totalReviews,
     averageRating,
     verifiedReviews,
+    tasteRating,
+    quantityRating,
+    priceRating,
+    averagePrice,
+    totalFavorites,
     submitReview,
-    getUserPermissions
+    getUserPermissions,
+    refreshReviews
   } = useProductReviews(product?.code);
   
   const { userReviewed, canLeaveReview, lastReviewDate, isLoggedIn } = getUserPermissions();
 
-  // Gestion de l'ouverture du formulaire d'ajout d'avis
   const handleShowAddReview = () => {
     if (!isLoggedIn) {
-      // Gérer l'erreur de non-connexion
-      alert("Vous devez être connecté pour laisser un avis");
+      setError("Vous devez être connecté pour laisser un avis");
+      setTimeout(() => setError(null), 5000);
       return;
     }
     
     if (userReviewed && !canLeaveReview) {
-      // Si l'utilisateur a déjà laissé un avis ce mois-ci, ne pas ouvrir le formulaire
       return;
     }
     
     setShowAddReview(true);
   };
 
-  // Gestion de l'annulation du formulaire d'ajout d'avis
   const handleCancelAddReview = () => {
     setShowAddReview(false);
   };
 
-  // Gestion du succès après l'ajout d'un avis
   const handleReviewSuccess = async (reviewData) => {
-    // Soumettre l'avis via le hook
     const result = await submitReview(reviewData);
     
     if (result.success) {
       setShowAddReview(false);
-      
-      // Recharger la page après un court délai pour afficher le nouvel avis
       setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+        refreshReviews();
+      }, 1000);
     }
+    
+    return result;
   };
 
-  // Obtenir le message à afficher sur le bouton
   const getButtonMessage = () => {
     if (userReviewed && !canLeaveReview) {
-      return "Vous avez déjà donné votre avis";
+      return "Avis déjà donné";
     }
     
     if (userReviewed && canLeaveReview) {
@@ -76,13 +72,9 @@ const PageAvisEnhanced = ({ product }) => {
     return "Donner mon avis";
   };
 
-  // Obtenir le tooltip à afficher sur le bouton
   const getButtonTooltip = () => {
     if (userReviewed && !canLeaveReview && lastReviewDate) {
-      const reviewDate = new Date(lastReviewDate);
-      const nextMonth = new Date(reviewDate);
-      nextMonth.setMonth(nextMonth.getMonth() + 1);
-      nextMonth.setDate(1); // Premier jour du mois suivant
+const nextMonth = new Date(new Date(lastReviewDate).setMonth(new Date(lastReviewDate).getMonth() + 1));
       
       return `Vous avez déjà laissé un avis le ${formatDate(lastReviewDate)}. 
               Vous pourrez laisser un nouvel avis à partir du ${formatDate(nextMonth)}.`;
@@ -90,28 +82,38 @@ const PageAvisEnhanced = ({ product }) => {
     return '';
   };
 
-  // Si aucun produit n'est sélectionné
   if (!product) return null;
   
+  // Enrichir l'objet product avec les données du hook
+  const enrichedProduct = {
+    ...product,
+    average_rating: averageRating || product.average_rating || 0,
+    total_reviews: totalReviews || product.total_reviews || 0,
+    taste_rating: tasteRating || product.taste_rating || 0,
+    quantity_rating: quantityRating || product.quantity_rating || 0,
+    price_rating: priceRating || product.price_rating || 0,
+    average_price: averagePrice || product.average_price || 0,
+    total_favorites: totalFavorites || product.total_favorites || 0
+  };
+  
   return (
-    <div>
+    <div className="animate-fadeIn">
       {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-          {error}
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start">
+          <AlertCircle size={20} className="text-red-500 mr-3 mt-0.5 flex-shrink-0" />
+          <span className="text-red-700">{error}</span>
         </div>
       )}
       
       {showAddReview ? (
-        // Afficher le formulaire d'ajout d'avis
         <ReviewForm 
-          product={product}
+          product={enrichedProduct}
           onSuccess={handleReviewSuccess}
           onCancel={handleCancelAddReview}
         />
       ) : (
-        // Afficher la liste des avis
         <ReviewsDisplay 
-          product={product}
+          product={enrichedProduct}
           onAddReviewClick={handleShowAddReview}
           buttonState={{
             disabled: userReviewed && !canLeaveReview,
@@ -125,6 +127,23 @@ const PageAvisEnhanced = ({ product }) => {
           verifiedReviews={verifiedReviews}
         />
       )}
+      
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        .animate-fadeIn {
+          animation: fadeIn 0.5s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 };
