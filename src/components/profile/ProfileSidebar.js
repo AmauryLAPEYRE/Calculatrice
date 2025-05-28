@@ -86,6 +86,7 @@ const ProfileSidebar = ({ currentUser, onLogout, loading }) => {
           icon: <History size={18} />,
           label: 'Historique',
           description: 'Produits consultés',
+          badge: userDetails?.scanCount || 0,
           color: 'blue'
         },
         {

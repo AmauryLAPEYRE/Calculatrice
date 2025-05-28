@@ -1,5 +1,5 @@
 // src/pages/ChallengesPage.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -29,30 +29,27 @@ import {
   Rocket,
   Medal
 } from 'lucide-react';
-import challengeService from '../services/challengeService';
 
 const ChallengesPage = () => {
   const { currentUser, userDetails } = useAuth();
-  const [loading, setLoading] = useState(true);
   const [activeStatus, setActiveStatus] = useState(0);
-  const [showConfetti, setShowConfetti] = useState(false);
   const [animatedProgress, setAnimatedProgress] = useState({});
   const [isVisible, setIsVisible] = useState(false);
   const [hoveredChallenge, setHoveredChallenge] = useState(null);
 
-  // Données utilisateur
-  const [userProgress, setUserProgress] = useState({
-    currentStatus: 'bronze',
-    currentPoints: 0,
-    totalScans: 0,
-    totalReviews: 0,
-    totalFavorites: 0,
-    totalLikes: 0,
-    firstReviews: 0,
-    categories: 0,
-    daysConnected: 0,
-    profileComplete: false
-  });
+  // Utiliser directement les données du contexte sans état local pour éviter les boucles
+  const userProgress = useMemo(() => ({
+    currentStatus: userDetails?.status || 'bronze',
+    currentPoints: 0, // Sera calculé plus tard si nécessaire
+    totalScans: userDetails?.scanCount || 0,
+    totalReviews: userDetails?.reviewCount || 0,
+    totalFavorites: userDetails?.favoriteCount || 0,
+    totalLikes: Math.floor((userDetails?.reviewCount || 0) * 2), // Estimation
+    firstReviews: Math.floor((userDetails?.reviewCount || 0) * 0.2), // Estimation
+    categories: Math.min(Math.floor((userDetails?.reviewCount || 0) / 5), 10), // Estimation
+    daysConnected: 7, // Valeur par défaut
+    profileComplete: !!(userDetails?.displayName && userDetails?.city && userDetails?.country && userDetails?.postalCode)
+  }), [userDetails]);
 
   // Configuration des statuts avec leurs challenges
   const getStatusLevels = () => [
@@ -153,66 +150,51 @@ const ChallengesPage = () => {
     return statusMap[userProgress.currentStatus] || 0;
   };
 
+  // Calculer les points totaux basés sur les achievements actuels
+  const calculateUserPoints = () => {
+    let points = 0;
+    
+    // Points pour scans
+    if (userProgress.totalScans >= 5) points += 50;
+    if (userProgress.totalScans >= 25) points += 100;
+    if (userProgress.totalScans >= 75) points += 300;
+    if (userProgress.totalScans >= 200) points += 1000;
+    
+    // Points pour reviews
+    if (userProgress.totalReviews >= 1) points += 50;
+    if (userProgress.totalReviews >= 5) points += 250;
+    if (userProgress.totalReviews >= 20) points += 1000;
+    if (userProgress.totalReviews >= 50) points += 2500;
+    
+    // Points pour favoris
+    if (userProgress.totalFavorites >= 3) points += 15;
+    
+    // Points pour profil complet
+    if (userProgress.profileComplete) points += 20;
+    
+    return points;
+  };
+
   // Déclencher l'animation de visibilité
   useEffect(() => {
     setIsVisible(true);
+    setActiveStatus(getCurrentStatusIndex());
   }, []);
 
-  // Effet de chargement
+  // Animer les barres de progression au montage
   useEffect(() => {
-    const loadUserProgress = async () => {
-      if (!userDetails?.id) return;
-      
-      setLoading(true);
-      try {
-        // Charger la progression de l'utilisateur
-        const { success, data, error } = await challengeService.getUserProgress(userDetails.id);
-        
-        if (success && data) {
-          setUserProgress({
-            currentStatus: data.currentStatus || 'bronze',
-            currentPoints: data.totalPointsEarned || 0,
-            totalScans: data.totalScans || 0,
-            totalReviews: data.totalReviews || 0,
-            totalFavorites: data.totalFavorites || 0,
-            totalLikes: data.totalLikes || 0,
-            firstReviews: data.firstReviews || 0,
-            categories: data.categories || 0,
-            daysConnected: data.daysConnected || 0,
-            profileComplete: data.profileComplete || false
-          });
-        } else if (error) {
-          console.error("Erreur lors du chargement de la progression:", error);
-        }
-      } catch (err) {
-        console.error("Erreur lors du chargement des données:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadUserProgress();
-  }, [userDetails?.id]);
-
-  // Animer les barres de progression après le chargement
-  useEffect(() => {
-    if (!loading) {
-      setActiveStatus(getCurrentStatusIndex());
-      
-      // Animer les barres de progression
-      const statusLevels = getStatusLevels();
-      statusLevels.forEach((status, statusIndex) => {
-        status.challenges.forEach((challenge, index) => {
-          setTimeout(() => {
-            setAnimatedProgress(prev => ({
-              ...prev,
-              [`${statusIndex}-${index}`]: (challenge.current / challenge.target) * 100
-            }));
-          }, 100 * index);
-        });
+    const statusLevels = getStatusLevels();
+    statusLevels.forEach((status, statusIndex) => {
+      status.challenges.forEach((challenge, index) => {
+        setTimeout(() => {
+          setAnimatedProgress(prev => ({
+            ...prev,
+            [`${statusIndex}-${index}`]: (challenge.current / challenge.target) * 100
+          }));
+        }, 100 * index);
       });
-    }
-  }, [loading, userProgress]);
+    });
+  }, [userProgress]); // Dépend de userProgress qui est mémorisé
 
   // Récupérer les statuts
   const statusLevels = getStatusLevels();
@@ -228,16 +210,20 @@ const ChallengesPage = () => {
     return challenges.reduce((sum, c) => sum + c.points, 0);
   };
 
-  if (loading) {
+  // Si pas d'utilisateur connecté
+  if (!currentUser || !userDetails) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-white flex items-center justify-center pt-20">
         <div className="text-center">
-          <Loader className="animate-spin h-12 w-12 text-green-600 mx-auto mb-4" />
-          <p className="text-green-700 font-medium">Chargement de vos challenges...</p>
+          <Trophy className="h-12 w-12 text-green-600 mx-auto mb-4" />
+          <p className="text-green-700 font-medium">Connectez-vous pour voir vos challenges</p>
         </div>
       </div>
     );
   }
+
+  // Points calculés
+  const totalPoints = calculateUserPoints();
 
   return (
     <section className="py-20 bg-gradient-to-br from-green-50 to-white min-h-screen">
@@ -295,7 +281,7 @@ const ChallengesPage = () => {
               {/* Avatar et statut */}
               <div className="relative group">
                 <div className="w-24 h-24 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center text-white text-3xl font-bold shadow-lg transform group-hover:scale-105 transition-transform duration-300">
-                  {userDetails?.display_name?.charAt(0).toUpperCase() || 'F'}
+                  {userDetails?.displayName?.charAt(0).toUpperCase() || 'F'}
                 </div>
                 {/* Badge de statut avec animation */}
                 <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-2xl animate-bounce-in">
@@ -308,14 +294,14 @@ const ChallengesPage = () => {
               {/* Informations utilisateur */}
               <div className="flex-1 text-center md:text-left">
                 <h2 className="text-2xl font-bold text-gray-800 mb-1">
-                  {userDetails?.display_name || currentUser?.displayName || 'Utilisateur'}
+                  {userDetails?.displayName || currentUser?.displayName || 'Utilisateur'}
                 </h2>
                 <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r ${statusLevels[getCurrentStatusIndex()].gradient} text-white animate-pulse-slow`}>
                     {statusLevels[getCurrentStatusIndex()].name}
                   </span>
                   <span className="text-gray-600">•</span>
-                  <span className="text-gray-600 font-medium">{userProgress.currentPoints} points</span>
+                  <span className="text-gray-600 font-medium">{totalPoints} points</span>
                 </div>
 
                 {/* Stats rapides avec animations au hover */}

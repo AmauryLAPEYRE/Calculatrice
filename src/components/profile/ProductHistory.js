@@ -1,5 +1,5 @@
-// src/components/profile/ProductHistory.js - Version modifiée avec vérification d'autorisation
-import React, { useState, useEffect } from 'react';
+// src/components/profile/ProductHistory.js - Version corrigée sans boucle infinie
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Clock, Search, Camera, Keyboard, ExternalLink, Loader, AlertCircle, Filter, Hash, ChevronDown, ChevronUp, Lock } from 'lucide-react';
 import { getUserHistory } from '../../services/productService';
@@ -19,47 +19,69 @@ const ProductHistory = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [groupedHistory, setGroupedHistory] = useState({});
   const [expandedProducts, setExpandedProducts] = useState({});
-  const [filter, setFilter] = useState('all'); // 'all', 'scan', 'search', 'manual_entry', 'searchName'
+  const [filter, setFilter] = useState('all');
   
-  // Utiliser le hook de permissions d'abonnement
+  // Utiliser le hook de permissions d'abonnement avec useMemo pour éviter les re-renders
   const { isAuthorized } = useSubscriptionPermissions();
+  const canAccessHistory = useMemo(() => isAuthorized('history'), [isAuthorized]);
 
-  // Récupérer l'historique de l'utilisateur
-  useEffect(() => {
-    const fetchHistory = async () => {
-      if (!currentUser || !userDetails) return;
-      
-      // Vérifier si l'utilisateur a l'autorisation d'accéder à l'historique
-      if (!isAuthorized('history')) {
-        setLoading(false);
-        return;
-      }
-      
-      setLoading(true);
-      
-      try {
-        const { success, data, total, error } = await getUserHistory(userDetails.id, 50, offset);
-        
-        if (success) {
-          setHistory(prev => offset === 0 ? data : [...prev, ...data]);
-          setTotal(total);
-          setHasMore(offset + data.length < total);
-        } else {
-          setError(error || "Impossible de récupérer votre historique");
-        }
-      } catch (err) {
-        console.error("Erreur lors de la récupération de l'historique:", err);
-        setError("Une erreur est survenue lors du chargement de votre historique");
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Fonction pour récupérer l'historique - avec useCallback pour éviter les re-créations
+  const fetchHistory = useCallback(async (currentOffset = 0, append = false) => {
+    if (!currentUser || !userDetails) {
+      setLoading(false);
+      return;
+    }
     
-    fetchHistory();
-  }, [currentUser, userDetails, offset, isAuthorized]);
+    // Vérifier les permissions une seule fois
+    if (!canAccessHistory) {
+      setLoading(false);
+      return;
+    }
+    
+    console.log(`Récupération de l'historique - offset: ${currentOffset}, append: ${append}`);
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const { success, data, total: totalCount, error: fetchError } = await getUserHistory(
+        userDetails.id, 
+        50, 
+        currentOffset
+      );
+      
+      if (success) {
+        console.log(`Historique récupéré: ${data.length} éléments, total: ${totalCount}`);
+        
+        setHistory(prev => append ? [...prev, ...data] : data);
+        setTotal(totalCount);
+        setHasMore(currentOffset + data.length < totalCount);
+        
+        // Réinitialiser l'offset si c'est un nouveau chargement
+        if (!append) {
+          setOffset(0);
+        }
+      } else {
+        console.error("Erreur lors de la récupération:", fetchError);
+        setError(fetchError || "Impossible de récupérer votre historique");
+      }
+    } catch (err) {
+      console.error("Erreur lors de la récupération de l'historique:", err);
+      setError("Une erreur est survenue lors du chargement de votre historique");
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUser, userDetails, canAccessHistory]);
+
+  // Effet initial pour charger l'historique - SANS offset dans les dépendances
+  useEffect(() => {
+    console.log("Effet initial - chargement de l'historique");
+    fetchHistory(0, false);
+  }, [fetchHistory]);
 
   // Regrouper l'historique par produit et filtrer selon les critères
   useEffect(() => {
+    console.log("Regroupement de l'historique, nombre d'éléments:", history.length);
+    
     // Filtrer d'abord par le filtre de type d'interaction
     let filtered = [...history];
     
@@ -93,7 +115,7 @@ const ProductHistory = () => {
     
     filtered.forEach(item => {
       const key = item.interaction_type === 'searchName' 
-        ? `search_${item.product_name}` // Clé unique pour les recherches par nom
+        ? `search_${item.product_name}` 
         : item.product_code;
       
       if (!grouped[key]) {
@@ -103,7 +125,7 @@ const ProductHistory = () => {
             product_name: item.product_name,
             product_brand: item.product_brand,
             product_image_url: item.product_image_url,
-            interaction_type: item.interaction_type, // Conserver le type d'interaction principal
+            interaction_type: item.interaction_type,
             search_criteria: item.search_criteria,
             total_results: item.total_results,
             last_interaction_date: item.interaction_date
@@ -133,26 +155,30 @@ const ProductHistory = () => {
       });
     });
     
+    console.log("Historique regroupé:", Object.keys(grouped).length, "produits uniques");
     setGroupedHistory(grouped);
   }, [history, searchTerm, filter]);
 
   // Basculer l'état d'expansion d'un produit
-  const toggleProductExpansion = (productKey) => {
+  const toggleProductExpansion = useCallback((productKey) => {
     setExpandedProducts(prev => ({
       ...prev,
       [productKey]: !prev[productKey]
     }));
-  };
+  }, []);
 
-  // Charger plus d'éléments d'historique
-  const loadMoreHistory = () => {
+  // Charger plus d'éléments d'historique - version corrigée
+  const loadMoreHistory = useCallback(() => {
     if (hasMore && !loading) {
-      setOffset(offset + 50);
+      const newOffset = offset + 50;
+      console.log("Chargement de plus d'historique, nouvel offset:", newOffset);
+      setOffset(newOffset);
+      fetchHistory(newOffset, true); // append = true
     }
-  };
+  }, [hasMore, loading, offset, fetchHistory]);
 
   // Formatage de la date pour l'affichage
-  const formatDate = (dateString) => {
+  const formatDate = useCallback((dateString) => {
     const date = new Date(dateString);
     const now = new Date();
     const diff = now - date;
@@ -179,19 +205,19 @@ const ProductHistory = () => {
       month: 'short',
       day: 'numeric'
     });
-  };
+  }, []);
 
   // Formater l'heure
-  const formatTime = (dateString) => {
+  const formatTime = useCallback((dateString) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString('fr-FR', {
       hour: '2-digit',
       minute: '2-digit'
     });
-  };
+  }, []);
 
   // Icône correspondant au type d'interaction
-  const getInteractionIcon = (type) => {
+  const getInteractionIcon = useCallback((type) => {
     switch (type) {
       case 'scan':
         return <Camera size={16} className="text-blue-500" />;
@@ -204,10 +230,10 @@ const ProductHistory = () => {
       default:
         return <Clock size={16} className="text-gray-500" />;
     }
-  };
+  }, []);
 
   // Libellé correspondant au type d'interaction
-  const getInteractionLabel = (type) => {
+  const getInteractionLabel = useCallback((type) => {
     switch (type) {
       case 'scan':
         return 'Scanné';
@@ -220,10 +246,10 @@ const ProductHistory = () => {
       default:
         return 'Consulté';
     }
-  };
+  }, []);
 
   // Composant pour afficher les filtres de recherche
-  const SearchFilters = ({ productInfo }) => {
+  const SearchFilters = React.memo(({ productInfo }) => {
     // Extraction des filtres à partir des métadonnées
     const withIngredients = productInfo.with_ingredients || [];
     const withoutIngredients = productInfo.without_ingredients || [];
@@ -254,7 +280,7 @@ const ProductHistory = () => {
         ))}
       </div>
     );
-  };
+  });
 
   // Afficher un placeholder pour l'historique vide
   const renderPlaceholder = () => (
@@ -313,16 +339,14 @@ const ProductHistory = () => {
     </div>
   );
 
+  console.log("Rendu du composant - Loading:", loading, "History length:", history.length, "Grouped:", Object.keys(groupedHistory).length);
+
   return (
     <ProfileLayout title="Historique des produits">
-      {loading && !isAuthorized('history') ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
-        </div>
-      ) : !isAuthorized('history') ? (
+      {!canAccessHistory ? (
         // Afficher le message d'upgrade si l'utilisateur n'a pas accès à l'historique
         renderSubscriptionUpgrade()
-      ) : loading && Object.keys(groupedHistory).length === 0 ? (
+      ) : loading && history.length === 0 ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
         </div>
@@ -334,13 +358,16 @@ const ProductHistory = () => {
           <h3 className="text-lg font-medium text-red-800">Une erreur est survenue</h3>
           <p className="mt-2 text-red-700">{error}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              setError(null);
+              fetchHistory(0, false);
+            }}
             className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
           >
             Réessayer
           </button>
         </div>
-      ) : Object.keys(groupedHistory).length === 0 ? (
+      ) : Object.keys(groupedHistory).length === 0 && history.length === 0 ? (
         renderPlaceholder()
       ) : (
         <div>
@@ -566,7 +593,7 @@ const ProductHistory = () => {
             <div className="flex justify-center mt-6">
               <button
                 onClick={loadMoreHistory}
-                className="px-4 py-2 bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors"
+                className="px-4 py-2 bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={loading}
               >
                 {loading ? (

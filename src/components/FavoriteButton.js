@@ -91,7 +91,9 @@ const FavoriteButton = ({ productCode, productData, size = 'md' }) => {
               product_name: productData?.product_name || null,
               product_brand: productData?.brands || null,
               product_image_url: productData?.image_url || null,
-              product_nutriscore: productData?.nutriscore_grade || null
+      product_nutriscore: (productData?.nutriscore_grade && productData.nutriscore_grade.length === 1) 
+        ? productData.nutriscore_grade 
+        : null
             }
           ]);
           

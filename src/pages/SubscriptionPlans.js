@@ -81,7 +81,7 @@ const SubscriptionPlans = () => {
             id: 2,
             name: 'Essential',
             description: 'Pour utilisateurs réguliers',
-            price_monthly: 1,
+            price_monthly: 0.99,
             price_yearly: 10,
             max_scan_auto: 9999,
             max_scan_manuel: 9999,
@@ -100,7 +100,7 @@ const SubscriptionPlans = () => {
             id: 3,
             name: 'Premium',
             description: 'Pour utilisateurs intensifs',
-            price_monthly: 20,
+            price_monthly: 19.99,
             price_yearly: 200,
             max_scan_auto: 9999,
             max_scan_manuel: 9999,
@@ -622,8 +622,8 @@ const SubscriptionPlans = () => {
                       <div className="flex items-baseline justify-center">
                         <span className="text-5xl font-bold text-gray-800">
                           {billingCycle === 'monthly' 
-                            ? `${plan.price_monthly.toFixed(0)}` 
-                            : `${(plan.price_yearly / 12).toFixed(0)}`}
+                            ? `${plan.price_monthly.toFixed(2)}` 
+                            : `${(plan.price_yearly / 12).toFixed(2)}`}
                         </span>
                         <span className="text-xl text-gray-500 ml-1">€</span>
                         <span className="text-gray-500 ml-1">/mois</span>
