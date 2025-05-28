@@ -126,21 +126,22 @@ export const getProductReviews = async (productCode, limit = 10, offset = 0) => 
       return {
         id: review.id,
         user_name: review.users.display_name,
+        user_id: review.user_id,
         comment: review.comment,
         date: review.creation_date,
         is_verified: review.is_verified,
         average_rating: review.average_rating,
         likes_count: review.likes_count,
         ratings: ratingsByCriteria,
-        // Nouveaux champs
         purchase_price: review.purchase_price,
         purchase_date: review.purchase_date,
         store_name: review.store_name,
         code_postal: codePostal, // NOUVEAU : Ajout du code postal
-        // Ne pas renvoyer les coordonnées précises par défaut pour des raisons de confidentialité
         has_location: !!review.purchase_location,
         // Ne pas envoyer le ticket si l'utilisateur n'a pas autorisé le partage
-        can_show_receipt: review.authorize_receipt_sharing && review.receipt_id
+        can_show_receipt: review.authorize_receipt_sharing && review.receipt_id,
+        review_source: review.review_source 
+
       };
     });
     
@@ -672,7 +673,8 @@ export const getUserReviews = async (userId, limit = 10, offset = 0) => {
         date: review.creation_date,
         is_verified: review.is_verified,
         average_rating: review.average_rating,
-        // Informations du produit
+          review_source: review.review_source, // AJOUT
+          // Informations du produit
         product_name: product?.product_name || 'Produit sans nom',
         product_brand: product?.brands || 'Marque inconnue',
         product_image_url: productImageUrl,

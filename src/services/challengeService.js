@@ -2,222 +2,411 @@
 import { supabase } from '../supabaseClient';
 
 /**
- * Service pour gérer les challenges utilisateurs
+ * Service pour gérer les challenges et statuts utilisateurs
  */
 
 /**
- * Récupère tous les challenges actifs
- * @param {string} userId - ID de l'utilisateur
- * @returns {Promise<Array>} Liste des challenges actifs
+ * Configuration des statuts et leurs challenges
  */
-export const getActiveUserChallenges = async (userId) => {
-  try {
-    if (!userId) throw new Error("ID utilisateur requis");
-    
-    const now = new Date().toISOString();
-    
-    // Récupérer les challenges actifs pour l'utilisateur
-    const { data, error } = await supabase
-      .from('user_challenges')
-      .select(`
-        *,
-        challenges (*)
-      `)
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .lte('challenges.start_date', now)
-      .gte('challenges.end_date', now)
-      .order('challenges.end_date', { ascending: true });
-    
-    if (error) throw error;
-    
-    return {
-      success: true,
-      data
-    };
-  } catch (error) {
-    console.error("Erreur lors de la récupération des challenges actifs:", error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-};
-
-/**
- * Récupère tous les challenges terminés
- * @param {string} userId - ID de l'utilisateur
- * @returns {Promise<Array>} Liste des challenges terminés
- */
-export const getCompletedUserChallenges = async (userId) => {
-  try {
-    if (!userId) throw new Error("ID utilisateur requis");
-    
-    const now = new Date().toISOString();
-    
-    // Récupérer les challenges terminés pour l'utilisateur
-    const { data, error } = await supabase
-      .from('user_challenges')
-      .select(`
-        *,
-        challenges (*)
-      `)
-      .eq('user_id', userId)
-      .or(`is_completed.eq.true, challenges.end_date.lt.${now}`)
-      .order('completed_date', { ascending: false });
-    
-    if (error) throw error;
-    
-    return {
-      success: true,
-      data
-    };
-  } catch (error) {
-    console.error("Erreur lors de la récupération des challenges terminés:", error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-};
-
-/**
- * Récupère les badges de l'utilisateur
- * @param {string} userId - ID de l'utilisateur
- * @returns {Promise<Array>} Liste des badges de l'utilisateur
- */
-export const getUserBadges = async (userId) => {
-  try {
-    if (!userId) throw new Error("ID utilisateur requis");
-    
-    // Récupérer les badges de l'utilisateur
-    const { data, error } = await supabase
-      .from('user_badges')
-      .select(`
-        *,
-        badges (*)
-      `)
-      .eq('user_id', userId)
-      .order('earned_date', { ascending: false });
-    
-    if (error) throw error;
-    
-    return {
-      success: true,
-      data
-    };
-  } catch (error) {
-    console.error("Erreur lors de la récupération des badges:", error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-};
-
-/**
- * Met à jour la progression d'un challenge
- * @param {string} userChallengeId - ID du challenge utilisateur
- * @param {number} newProgress - Nouvelle valeur de progression
- * @returns {Promise<Object>} Résultat de la mise à jour
- */
-export const updateChallengeProgress = async (userChallengeId, newProgress) => {
-  try {
-    if (!userChallengeId) throw new Error("ID du challenge utilisateur requis");
-    
-    // Mettre à jour la progression
-    const { data, error } = await supabase
-      .from('user_challenges')
-      .update({ 
-        current_progress: newProgress,
-        last_updated: new Date().toISOString()
-      })
-      .eq('id', userChallengeId)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    // Vérifier si le challenge est maintenant terminé
-    if (data.current_progress >= data.target_progress && !data.is_completed) {
-      // Marquer le challenge comme terminé
-      const { error: completeError } = await supabase
-        .from('user_challenges')
-        .update({ 
-          is_completed: true,
-          completed_date: new Date().toISOString()
-        })
-        .eq('id', userChallengeId);
-      
-      if (completeError) throw completeError;
+const STATUS_CONFIG = {
+  bronze: {
+    name: 'Bronze',
+    requiredPoints: 0,
+    challenges: {
+      scan5: { target: 5, points: 50 },
+      review1: { target: 1, points: 50 },
+      fav3: { target: 3, points: 15 },
+      profile: { target: 1, points: 20 }
     }
-    
-    return {
-      success: true,
-      data
-    };
-  } catch (error) {
-    console.error("Erreur lors de la mise à jour de la progression:", error);
-    return {
-      success: false,
-      error: error.message
-    };
+  },
+  argent: {
+    name: 'Argent',
+    requiredPoints: 135,
+    challenges: {
+      scan25: { target: 25, points: 100 },
+      review5: { target: 5, points: 250 },
+      likes10: { target: 10, points: 50 },
+      days7: { target: 7, points: 70 }
+    }
+  },
+  or: {
+    name: 'Or',
+    requiredPoints: 605,
+    challenges: {
+      scan75: { target: 75, points: 300 },
+      review20: { target: 20, points: 1000 },
+      first3: { target: 3, points: 450 },
+      likes50: { target: 50, points: 250 },
+      days30: { target: 30, points: 300 }
+    }
+  },
+  diamant: {
+    name: 'Diamant',
+    requiredPoints: 2905,
+    challenges: {
+      scan200: { target: 200, points: 1000 },
+      review50: { target: 50, points: 2500 },
+      first10: { target: 10, points: 1500 },
+      likes200: { target: 200, points: 1000 },
+      cat5: { target: 5, points: 500 },
+      days90: { target: 90, points: 900 }
+    }
   }
 };
 
 /**
- * Récupère les informations de niveau de l'utilisateur
+ * Récupère la progression complète de l'utilisateur
  * @param {string} userId - ID de l'utilisateur
- * @returns {Promise<Object>} Informations sur le niveau
+ * @returns {Promise<Object>} Progression de l'utilisateur
  */
-export const getUserLevelInfo = async (userId) => {
+export const getUserProgress = async (userId) => {
   try {
     if (!userId) throw new Error("ID utilisateur requis");
-    
-    // Récupérer les informations sur l'utilisateur
+
+    // Récupérer les données de l'utilisateur
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('points, status')
+      .select('*')
       .eq('id', userId)
       .single();
-    
+
     if (userError) throw userError;
-    
-    // Récupérer les informations sur les niveaux
-    const { data: levelData, error: levelError } = await supabase
-      .from('user_levels')
-      .select('*')
-      .order('required_points', { ascending: true });
-    
-    if (levelError) throw levelError;
-    
-    // Déterminer le niveau actuel et le prochain niveau
-    const currentPoints = userData.points || 0;
-    const currentStatus = userData.status || 'bronze';
-    
-    let currentLevel = levelData.find(level => level.name.toLowerCase() === currentStatus.toLowerCase());
-    let nextLevel = levelData.find(level => level.required_points > currentPoints);
-    
-    if (!currentLevel) {
-      currentLevel = levelData[0]; // Par défaut, niveau le plus bas
+
+    // Récupérer le nombre total de scans (produits consultés)
+    const { count: totalScans } = await supabase
+      .from('product_views')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    // Récupérer le nombre total d'avis publiés
+    const { count: totalReviews } = await supabase
+      .from('product_reviews')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .in('status', ['approved', 'approved_auto']);
+
+    // Récupérer le nombre total de favoris
+    const { count: totalFavorites } = await supabase
+      .from('favorites')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    // Récupérer le nombre total de likes reçus
+    const { data: userReviews } = await supabase
+      .from('product_reviews')
+      .select('id')
+      .eq('user_id', userId)
+      .in('status', ['approved', 'approved_auto']);
+
+    let totalLikes = 0;
+    if (userReviews && userReviews.length > 0) {
+      const reviewIds = userReviews.map(r => r.id);
+      const { count: likesCount } = await supabase
+        .from('review_likes')
+        .select('*', { count: 'exact', head: true })
+        .in('review_id', reviewIds);
+      totalLikes = likesCount || 0;
     }
-    
-    if (!nextLevel && levelData.length > 0) {
-      nextLevel = levelData[levelData.length - 1]; // Niveau maximum si déjà au max
-    }
+
+    // Récupérer le nombre de premiers avis
+    const { count: firstReviews } = await supabase
+      .from('product_reviews')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_first_review', true)
+      .in('status', ['approved', 'approved_auto']);
+
+    // Récupérer le nombre de catégories différentes
+    const { data: categoriesData } = await supabase
+      .from('product_reviews')
+      .select('products!inner(category)')
+      .eq('user_id', userId)
+      .in('status', ['approved', 'approved_auto']);
+
+    const uniqueCategories = new Set(categoriesData?.map(r => r.products?.category).filter(Boolean));
+    const totalCategories = uniqueCategories.size;
+
+    // Calculer les jours de connexion (simulé pour la démo)
+    const accountAge = new Date() - new Date(userData.created_at);
+    const daysConnected = Math.min(Math.floor(accountAge / (1000 * 60 * 60 * 24)), 90);
+
+    // Vérifier si le profil est complet
+    const profileComplete = !!(
+      userData.display_name && 
+      userData.country && 
+      userData.city && 
+      userData.postal_code
+    );
+
+    // Calculer le statut actuel et les points
+    const progress = {
+      currentStatus: userData.status || 'bronze',
+      currentPoints: userData.points || 0,
+      totalScans: totalScans || 0,
+      totalReviews: totalReviews || 0,
+      totalFavorites: totalFavorites || 0,
+      totalLikes: totalLikes || 0,
+      firstReviews: firstReviews || 0,
+      categories: totalCategories || 0,
+      daysConnected: daysConnected || 0,
+      profileComplete: profileComplete
+    };
+
+    // Calculer les challenges complétés et les points gagnés
+    const challengesStatus = calculateChallengesStatus(progress);
     
     return {
       success: true,
       data: {
-        currentPoints,
-        currentStatus,
-        currentLevel,
-        nextLevel,
-        progress: currentPoints / (nextLevel?.required_points || 1000) * 100
+        ...progress,
+        ...challengesStatus
       }
     };
   } catch (error) {
-    console.error("Erreur lors de la récupération des informations de niveau:", error);
+    console.error("Erreur lors de la récupération de la progression:", error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+/**
+ * Calcule le statut des challenges pour un utilisateur
+ * @param {Object} progress - Progression actuelle de l'utilisateur
+ * @returns {Object} Statut des challenges
+ */
+const calculateChallengesStatus = (progress) => {
+  const statusOrder = ['bronze', 'argent', 'or', 'diamant'];
+  let totalPointsEarned = 0;
+  let completedChallenges = {};
+  let nextStatus = null;
+  let pointsToNextStatus = 0;
+
+  // Parcourir chaque statut
+  for (let i = 0; i < statusOrder.length; i++) {
+    const status = statusOrder[i];
+    const config = STATUS_CONFIG[status];
+    
+    // Vérifier chaque challenge du statut
+    for (const [challengeId, challengeConfig] of Object.entries(config.challenges)) {
+      let current = 0;
+      
+      // Mapper les challenges aux données de progression
+      switch(challengeId) {
+        case 'scan5':
+        case 'scan25':
+        case 'scan75':
+        case 'scan200':
+          current = progress.totalScans;
+          break;
+        case 'review1':
+        case 'review5':
+        case 'review20':
+        case 'review50':
+          current = progress.totalReviews;
+          break;
+        case 'fav3':
+          current = progress.totalFavorites;
+          break;
+        case 'profile':
+          current = progress.profileComplete ? 1 : 0;
+          break;
+        case 'likes10':
+        case 'likes50':
+        case 'likes200':
+          current = progress.totalLikes;
+          break;
+        case 'days7':
+        case 'days30':
+        case 'days90':
+          current = progress.daysConnected;
+          break;
+        case 'first3':
+        case 'first10':
+          current = progress.firstReviews;
+          break;
+        case 'cat5':
+          current = progress.categories;
+          break;
+      }
+      
+      // Si le challenge est complété, ajouter les points
+      if (current >= challengeConfig.target) {
+        if (!completedChallenges[status]) {
+          completedChallenges[status] = [];
+        }
+        completedChallenges[status].push(challengeId);
+        totalPointsEarned += challengeConfig.points;
+      }
+    }
+    
+    // Déterminer le prochain statut
+    if (progress.currentStatus === status && i < statusOrder.length - 1) {
+      nextStatus = statusOrder[i + 1];
+      pointsToNextStatus = STATUS_CONFIG[nextStatus].requiredPoints - totalPointsEarned;
+    }
+  }
+
+  return {
+    totalPointsEarned,
+    completedChallenges,
+    nextStatus,
+    pointsToNextStatus: Math.max(0, pointsToNextStatus)
+  };
+};
+
+/**
+ * Met à jour le statut de l'utilisateur si nécessaire
+ * @param {string} userId - ID de l'utilisateur
+ * @returns {Promise<Object>} Résultat de la mise à jour
+ */
+export const updateUserStatus = async (userId) => {
+  try {
+    if (!userId) throw new Error("ID utilisateur requis");
+
+    // Récupérer la progression actuelle
+    const { success, data: progress, error } = await getUserProgress(userId);
+    
+    if (!success || error) throw new Error(error || "Erreur lors de la récupération de la progression");
+
+    // Déterminer le nouveau statut basé sur les points
+    let newStatus = 'bronze';
+    if (progress.totalPointsEarned >= STATUS_CONFIG.diamant.requiredPoints) {
+      newStatus = 'diamant';
+    } else if (progress.totalPointsEarned >= STATUS_CONFIG.or.requiredPoints) {
+      newStatus = 'or';
+    } else if (progress.totalPointsEarned >= STATUS_CONFIG.argent.requiredPoints) {
+      newStatus = 'argent';
+    }
+
+    // Mettre à jour si le statut a changé
+    if (newStatus !== progress.currentStatus) {
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ 
+          status: newStatus,
+          points: progress.totalPointsEarned,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+
+      if (updateError) throw updateError;
+
+      return {
+        success: true,
+        statusChanged: true,
+        oldStatus: progress.currentStatus,
+        newStatus: newStatus,
+        totalPoints: progress.totalPointsEarned
+      };
+    }
+
+    // Mettre à jour les points même si le statut n'a pas changé
+    const { error: pointsError } = await supabase
+      .from('users')
+      .update({ 
+        points: progress.totalPointsEarned,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (pointsError) throw pointsError;
+
+    return {
+      success: true,
+      statusChanged: false,
+      currentStatus: progress.currentStatus,
+      totalPoints: progress.totalPointsEarned
+    };
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour du statut:", error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+/**
+ * Enregistre une action utilisateur et met à jour les compteurs
+ * @param {string} userId - ID de l'utilisateur
+ * @param {string} actionType - Type d'action (scan, review, favorite, like)
+ * @param {Object} metadata - Métadonnées supplémentaires
+ * @returns {Promise<Object>} Résultat de l'action
+ */
+export const recordUserAction = async (userId, actionType, metadata = {}) => {
+  try {
+    if (!userId || !actionType) throw new Error("ID utilisateur et type d'action requis");
+
+    // Mettre à jour les compteurs selon le type d'action
+    let updateData = {};
+    
+    switch(actionType) {
+      case 'scan':
+        updateData.scan_count = supabase.raw('scan_count + 1');
+        break;
+      case 'review':
+        updateData.review_count = supabase.raw('review_count + 1');
+        break;
+      case 'favorite':
+        updateData.favorite_count = supabase.raw('favorite_count + 1');
+        break;
+      case 'search':
+        if (metadata.searchType === 'manual') {
+          updateData.manual_search_count = supabase.raw('manual_search_count + 1');
+        } else {
+          updateData.search_by_name_count = supabase.raw('search_by_name_count + 1');
+        }
+        break;
+    }
+
+    // Mettre à jour l'utilisateur
+    const { error } = await supabase
+      .from('users')
+      .update(updateData)
+      .eq('id', userId);
+
+    if (error) throw error;
+
+    // Vérifier et mettre à jour le statut
+    const statusUpdate = await updateUserStatus(userId);
+
+    return {
+      success: true,
+      actionRecorded: true,
+      ...statusUpdate
+    };
+  } catch (error) {
+    console.error("Erreur lors de l'enregistrement de l'action:", error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+/**
+ * Récupère le classement des utilisateurs
+ * @param {number} limit - Nombre d'utilisateurs à récupérer
+ * @returns {Promise<Object>} Classement des utilisateurs
+ */
+export const getUserRanking = async (limit = 10) => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, display_name, status, points, review_count')
+      .order('points', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      ranking: data || []
+    };
+  } catch (error) {
+    console.error("Erreur lors de la récupération du classement:", error);
     return {
       success: false,
       error: error.message
@@ -226,9 +415,9 @@ export const getUserLevelInfo = async (userId) => {
 };
 
 export default {
-  getActiveUserChallenges,
-  getCompletedUserChallenges,
-  getUserBadges,
-  updateChallengeProgress,
-  getUserLevelInfo
+  getUserProgress,
+  updateUserStatus,
+  recordUserAction,
+  getUserRanking,
+  STATUS_CONFIG
 };

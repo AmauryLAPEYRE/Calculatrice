@@ -18,6 +18,7 @@ import {
   Sparkles,
   Shield,
   Camera,
+  BarChart3,
   ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -28,6 +29,7 @@ import {
 } from '../../services/reviewService';
 import { formatPrice } from '../../utils/formatters';
 import PriceHistory from './PriceHistory';
+import UserProfileModal from '../profile/UserProfileModal';
 
 const ReviewsDisplay = ({ 
   product, 
@@ -44,12 +46,14 @@ const ReviewsDisplay = ({
   const [showReceiptImage, setShowReceiptImage] = useState(null);
   const [reviewLikes, setReviewLikes] = useState({});
   const [hoveredReview, setHoveredReview] = useState(null);
-  
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [showUserModal, setShowUserModal] = useState(false);
+
   // Vérifier les likes
   useEffect(() => {
     const checkLikes = async () => {
       if (!currentUser || !userDetails || reviews.length === 0) return;
-      
+
       const newLikes = {};
       for (const review of reviews) {
         const { success, hasLiked } = await checkUserLike(userDetails.id, review.id);
@@ -59,9 +63,28 @@ const ReviewsDisplay = ({
       }
       setReviewLikes(newLikes);
     };
-    
+
     checkLikes();
   }, [currentUser, userDetails, reviews]);
+
+  const handleUserClick = (review) => {
+    // Ne pas ouvrir la modal pour les avis IA
+    if (review.review_source === 'ai') {
+      return;
+    }
+    
+    // Vérifier qu'on a bien les données nécessaires
+    if (review.user_id && review.user_name) {
+      console.log('Opening modal for user:', review.user_id, review.user_name); // Debug
+      setSelectedUser({ 
+        userId: review.user_id,
+        userName: review.user_name 
+      });
+      setShowUserModal(true);
+    } else {
+      console.error('Missing user data:', review); // Debug si données manquantes
+    }
+  };
 
   const handleViewReceipt = async (reviewId) => {
     try {
@@ -79,19 +102,19 @@ const ReviewsDisplay = ({
   const handleCloseReceiptModal = () => {
     setShowReceiptImage(null);
   };
-  
+
   const handleLikeReview = async (reviewId) => {
     if (!currentUser || !userDetails) {
       setError("Vous devez être connecté pour aimer un avis");
       setTimeout(() => setError(null), 3000);
       return;
     }
-    
+
     const currentlyLiked = reviewLikes[reviewId] || false;
-    
+
     try {
       const { success } = await toggleReviewLike(userDetails.id, reviewId, !currentlyLiked);
-      
+
       if (success) {
         setReviewLikes(prev => ({
           ...prev,
@@ -102,21 +125,21 @@ const ReviewsDisplay = ({
       console.error("Erreur lors de l'ajout/retrait du like:", err);
     }
   };
-    
+
   const renderPreciseStars = (rating, size = 20) => {
     const ratingNum = parseFloat(rating);
-    
+
     return (
       <div className="flex">
         {[1, 2, 3, 4, 5].map((star) => {
           let fillPercentage = 0;
-          
+
           if (ratingNum >= star) {
             fillPercentage = 100;
           } else if (ratingNum > star - 1) {
             fillPercentage = Math.round((ratingNum - (star - 1)) * 100);
           }
-          
+
           return (
             <div key={star} className="relative" style={{ width: size, height: size }}>
               <Star size={size} className="absolute text-gray-300" />
@@ -144,15 +167,15 @@ const ReviewsDisplay = ({
       day: 'numeric'
     });
   };
-  
+
   if (!product) return null;
-  
+
   const showDetailedRatings = product && (
     product.taste_rating > 0 || 
     product.quantity_rating > 0 || 
     product.price_rating > 0
   );
-  
+
   return (
     <div className="space-y-8">
       {/* Hero Section des Avis */}
@@ -173,7 +196,7 @@ const ReviewsDisplay = ({
                   {totalReviews} avis au total
                 </p>
               </div>
-              
+
               {/* Badges de confiance */}
               <div className="space-y-3">
                 {verifiedReviews > 0 && (
@@ -184,7 +207,7 @@ const ReviewsDisplay = ({
                     </span>
                   </div>
                 )}
-                
+
                 {totalReviews > 10 && (
                   <div className="flex items-center bg-amber-100 px-4 py-2 rounded-full animate-pulse">
                     <TrendingUp size={20} className="text-amber-600 mr-2" />
@@ -193,7 +216,7 @@ const ReviewsDisplay = ({
                     </span>
                   </div>
                 )}
-                
+
                 {product.total_favorites > 0 && (
                   <div className="flex items-center bg-pink-100 px-4 py-2 rounded-full">
                     <Heart size={20} className="text-pink-600 fill-pink-600 mr-2" />
@@ -204,7 +227,7 @@ const ReviewsDisplay = ({
                 )}
               </div>
             </div>
-            
+
             {/* Notes détaillées avec barres de progression */}
             {showDetailedRatings && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -224,7 +247,7 @@ const ReviewsDisplay = ({
                     </div>
                   </div>
                 )}
-                
+
                 {product.quantity_rating > 0 && (
                   <div className="bg-white rounded-xl p-4 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
@@ -241,7 +264,7 @@ const ReviewsDisplay = ({
                     </div>
                   </div>
                 )}
-                
+
                 {product.price_rating > 0 && (
                   <div className="bg-white rounded-xl p-4 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
@@ -260,7 +283,7 @@ const ReviewsDisplay = ({
                 )}
               </div>
             )}
-            
+
             {/* Historique des prix */}
             {product.average_price > 0 && (
               <div className="mt-6">
@@ -271,7 +294,7 @@ const ReviewsDisplay = ({
               </div>
             )}
           </div>
-          
+
           {/* CTA pour donner son avis */}
           <div className="text-center">
             <button
@@ -286,7 +309,7 @@ const ReviewsDisplay = ({
               <span className="text-lg">{buttonState.message || "Donner mon avis"}</span>
               <Sparkles size={16} className="ml-2 animate-pulse" />
             </button>
-            
+
             {!currentUser && (
               <p className="text-sm text-gray-500 mt-3">
                 Connectez-vous pour partager votre expérience
@@ -295,7 +318,7 @@ const ReviewsDisplay = ({
           </div>
         </div>
       </div>
-      
+
       {/* Section des avis */}
       <div>
         <h3 className="text-2xl font-bold text-green-800 mb-6 flex items-center">
@@ -307,14 +330,14 @@ const ReviewsDisplay = ({
             </span>
           )}
         </h3>
-        
+
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start animate-fadeIn">
             <AlertCircle size={20} className="text-red-500 mr-3 mt-0.5 flex-shrink-0" />
             <span className="text-red-700">{error}</span>
           </div>
         )}
-        
+
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="relative">
@@ -328,34 +351,62 @@ const ReviewsDisplay = ({
             {reviews.map((review, index) => (
               <div 
                 key={review.id} 
-                className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.01] border border-gray-100 overflow-hidden"
+                  className={`group rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.01] border overflow-hidden ${
+                    review.review_source === 'ai' 
+                      ? 'bg-white border-red-200' // Fond blanc avec bordure rouge pour les avis IA
+                      : 'bg-white border-gray-100'  // Fond blanc avec bordure grise pour les avis utilisateurs
+                  }`}
                 onMouseEnter={() => setHoveredReview(review.id)}
                 onMouseLeave={() => setHoveredReview(null)}
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 {/* En-tête de l'avis */}
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6">
+                  <div className={`${
+                  review.review_source === 'ai' 
+                    ? 'bg-gradient-to-r from-red-100 to-red-50' // En-tête rouge pour IA
+                    : 'bg-gradient-to-r from-green-50 to-emerald-50' // En-tête verte pour utilisateurs
+                } p-6`}>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center">
-                      {/* Avatar utilisateur */}
-                      <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
-                        {review.user_name.charAt(0).toUpperCase()}
-                      </div>
-                      
+                      {/* Avatar utilisateur cliquable */}
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4 ${
+                          review.review_source === 'ai'
+                            ? 'bg-gradient-to-br from-red-400 to-red-600' // Avatar rouge pour IA
+                            : 'bg-gradient-to-br from-green-400 to-green-600 cursor-pointer hover:from-green-500 hover:to-green-700 transition-all transform hover:scale-110 hover-pulse' // Avatar vert cliquable pour utilisateurs
+                        }`}
+                        onClick={() => review.review_source !== 'ai' && handleUserClick(review)}
+                        >
+                          {review.review_source === 'ai' ? '🤖' : review.user_name.charAt(0).toUpperCase()}
+                        </div>                      
                       <div>
                         <div className="flex items-center gap-3">
-                          <h4 className="font-semibold text-green-800">{review.user_name}</h4>
-                          {review.is_verified && (
+                          <h4 
+                            className={`font-semibold ${
+                              review.review_source === 'ai' 
+                                ? 'text-gray-800' 
+                                : 'text-green-800 cursor-pointer hover:text-green-600 transition-colors hover:underline'
+                            }`}
+                            onClick={() => review.review_source !== 'ai' && handleUserClick(review)}
+                          >
+                            {review.user_name}
+                          </h4>
+                          {review.review_source !== 'ai' && review.is_verified  && (
                             <span className="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full flex items-center font-medium">
                               <CheckCircle size={14} className="mr-1" />
                               Achat vérifié
                             </span>
                           )}
+          {review.review_source === 'ai' && (
+            <span className="bg-red-100 text-red-700 text-xs px-3 py-1 rounded-full flex items-center font-medium">
+              <CheckCircle size={14} className="mr-1" />
+              Généré par l'IA
+            </span>
+          )}
                         </div>
                         <p className="text-sm text-gray-500 mt-1">{formatDate(review.date)}</p>
                       </div>
                     </div>
-                    
+
                     {/* Bouton like */}
                     <button 
                       className={`group/like p-3 rounded-full transition-all duration-300 ${
@@ -378,16 +429,26 @@ const ReviewsDisplay = ({
                       </div>
                     </button>
                   </div>
-                  
+
                   {/* Note principale */}
-                  <div className="mt-4 flex items-center gap-3">
-                    {renderPreciseStars(review.average_rating, 24)}
-                    <span className="text-xl font-bold text-green-800">
+         <div className="mt-4 flex items-center gap-3">
+    {renderPreciseStars(review.average_rating, 24)}
+    <span className={`text-xl font-bold ${
+      review.review_source === 'ai' ? 'text-red-800' : 'text-green-800'
+    }`}>
                       {parseFloat(review.average_rating).toFixed(2)}
                     </span>
                   </div>
                 </div>
-                
+                {review.review_source === 'ai' && (
+  <div className="bg-red-100 border-l-4 border-red-400 p-4 mx-6 mt-4 rounded">
+    <div className="flex items-center">
+      <div className="text-red-600 text-sm">
+        <strong>Avis simulé :</strong> Cet avis a été généré par intelligence artificielle à des fins de démonstration.
+      </div>
+    </div>
+  </div>
+)}
                 {/* Corps de l'avis */}
                 <div className="p-6">
                   {/* Notes détaillées */}
@@ -407,16 +468,20 @@ const ReviewsDisplay = ({
                       ))}
                     </div>
                   )}
-                  
+
                   {/* Commentaire */}
                   <p className="text-gray-700 leading-relaxed">{review.comment}</p>
-                  
+
                   {/* Informations d'achat */}
                   {(review.purchase_date || review.purchase_price || review.store_name) && (
                     <div className="mt-6 pt-6 border-t border-gray-100">
                       <h5 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-                        <ShoppingBag size={16} className="mr-2 text-green-600" />
-                        Détails de l'achat
+                        {review.review_source === 'ai' ? (
+  <BarChart3 size={16} className="mr-2 text-red-600" />     // Icône moyenne rouge pour IA
+) : (
+  <ShoppingBag size={16} className="mr-2 text-green-600" /> // Icône shopping verte pour utilisateurs
+)}
+                        {review.review_source === 'ai' ? 'Prix moyen' : 'Détails de l\'achat'}
                       </h5>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         {review.purchase_date && (
@@ -425,15 +490,21 @@ const ReviewsDisplay = ({
                             {formatDate(review.purchase_date)}
                           </div>
                         )}
-                        
-                        {review.purchase_price && (
+
+                        {review.purchase_price && review.review_source != 'ai' &&(
                           <div className="flex items-center text-sm">
                             <span className="font-medium text-green-700">
                               {formatPrice(review.purchase_price)}
                             </span>
                           </div>
                         )}
-                        
+                        {review.purchase_price && review.review_source === 'ai' &&(
+                          <div className="flex items-center text-sm">
+                            <span className="font-medium text-red-700">
+                              {formatPrice(review.purchase_price)}
+                            </span>
+                          </div>
+                        )}
                         {review.store_name && (
                           <div className="flex items-center text-sm text-gray-600">
                             <MapPin size={14} className="text-gray-400 mr-2" />
@@ -443,7 +514,7 @@ const ReviewsDisplay = ({
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Bouton ticket de caisse */}
                   {review.can_show_receipt && (
                     <button
@@ -481,7 +552,7 @@ const ReviewsDisplay = ({
           </div>
         )}
       </div>
-      
+
       {/* Modal ticket de caisse */}
       {showReceiptImage && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-75 backdrop-blur-sm flex items-center justify-center p-4">
@@ -522,7 +593,18 @@ const ReviewsDisplay = ({
           </div>
         </div>
       )}
-      
+
+      {/* Modal de profil utilisateur */}
+      <UserProfileModal
+        userId={selectedUser?.userId}
+        userName={selectedUser?.userName}
+        isOpen={showUserModal}
+        onClose={() => {
+          setShowUserModal(false);
+          setSelectedUser(null);
+        }}
+      />
+
       <style jsx>{`
         @keyframes fadeIn {
           from {
@@ -535,8 +617,24 @@ const ReviewsDisplay = ({
           }
         }
         
+        @keyframes pulse {
+          0% {
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+          }
+          70% {
+            box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+          }
+        }
+        
         .animate-fadeIn {
           animation: fadeIn 0.5s ease-out forwards;
+        }
+        
+        .hover-pulse:hover {
+          animation: pulse 1.5s infinite;
         }
       `}</style>
     </div>

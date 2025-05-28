@@ -106,7 +106,7 @@ export const generateAIReview = async (params) => {
 
     // Appel à l'API avec timeout de 12 secondes
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 136000);
 
     const startTime = Date.now();
 

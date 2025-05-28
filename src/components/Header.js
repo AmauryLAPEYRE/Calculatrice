@@ -311,8 +311,8 @@ const Header = () => {
                       
                       {/* Badge Premium si applicable */}
                       {subscriptionPlan?.name && subscriptionPlan.name !== 'Gratuit' && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md animate-shimmer">
-                          <Sparkles size={10} className="mr-0.5" />
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md">
+                          <Sparkles size={10} className="mr-0.5 animate-pulse" />
                           {subscriptionPlan.name}
                         </span>
                       )}
@@ -578,15 +578,6 @@ const Header = () => {
           }
         }
 
-        @keyframes shimmer {
-          0% {
-            background-position: -200% center;
-          }
-          100% {
-            background-position: 200% center;
-          }
-        }
-
         @keyframes float-1 {
           0%, 100% {
             transform: translateY(0) translateX(0);
@@ -648,11 +639,6 @@ const Header = () => {
 
         .animate-fadeIn {
           animation: fadeIn 0.3s ease-out forwards;
-        }
-
-        .animate-shimmer {
-          background-size: 200% 100%;
-          animation: shimmer 3s ease-in-out infinite;
         }
 
         .animate-float-1 {

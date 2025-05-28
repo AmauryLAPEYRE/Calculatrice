@@ -8,6 +8,7 @@
 *.pem
 secrets/
 config/
+build/
 
 # Python
 __pycache__/

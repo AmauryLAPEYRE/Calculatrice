@@ -334,7 +334,7 @@ const ProductDetail = ({ product }) => {
                   {/* Note principale ÉNORME */}
                   <div className="text-center">
                     <div className="text-6xl font-bold text-white">
-                      {displayStats.average_rating ? displayStats.average_rating.toFixed(2) : '0.0'}
+                      {displayStats.average_rating ? displayStats.average_rating.toFixed(2) : '0.00'}
                     </div>
                     <div className="flex justify-center mt-2">
                       {[1, 2, 3, 4, 5].map((star) => (
