@@ -6,10 +6,12 @@ import ReviewForm from './Review/ReviewForm';
 import useProductReviews from '../hooks/useProductReviews';
 import { formatDate } from '../utils/formatters';
 import { AlertCircle } from 'lucide-react';
+import UserProfileModal from './profile/UserProfileModal';
 
 const PageAvisEnhanced = ({ product }) => {
   const [showAddReview, setShowAddReview] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
   
   const {
     loading,
@@ -125,6 +127,7 @@ const nextMonth = new Date(new Date(lastReviewDate).setMonth(new Date(lastReview
           totalReviews={totalReviews}
           averageRating={averageRating}
           verifiedReviews={verifiedReviews}
+          onUserClick={(userId, userName) => setSelectedUser({ userId, userName })}
         />
       )}
       
@@ -144,6 +147,14 @@ const nextMonth = new Date(new Date(lastReviewDate).setMonth(new Date(lastReview
           animation: fadeIn 0.5s ease-out forwards;
         }
       `}</style>
+      
+      {/* Modal du profil utilisateur */}
+      <UserProfileModal
+        userId={selectedUser?.userId}
+        userName={selectedUser?.userName}
+        isOpen={!!selectedUser}
+        onClose={() => setSelectedUser(null)}
+      />
     </div>
   );
 };

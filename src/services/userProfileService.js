@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 // src/services/userProfileService.js
+=======
+>>>>>>> 2a08158ed3439faebfc2602d126eb315f82c366a
 import { supabase } from '../supabaseClient';
 
 export const userProfileService = {

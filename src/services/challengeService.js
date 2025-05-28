@@ -414,10 +414,126 @@ export const getUserRanking = async (limit = 10) => {
   }
 };
 
+/**
+ * Récupère la progression globale de l'utilisateur
+ * @param {string} userId - ID de l'utilisateur
+ * @returns {Promise<Object>} Progression de l'utilisateur
+ */
+export const getUserProgress = async (userId) => {
+  try {
+    if (!userId) throw new Error("ID utilisateur requis");
+    
+    // Récupérer les informations de base de l'utilisateur
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (userError) throw userError;
+    
+    // Récupérer le nombre total de scans
+    const { count: scansCount, error: scansError } = await supabase
+      .from('scanned_products')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    
+    if (scansError) console.error("Erreur scans:", scansError);
+    
+    // Récupérer le nombre total d'avis
+    const { count: reviewsCount, error: reviewsError } = await supabase
+      .from('product_reviews')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    
+    if (reviewsError) console.error("Erreur reviews:", reviewsError);
+    
+    // Récupérer le nombre de favoris
+    const { count: favoritesCount, error: favoritesError } = await supabase
+      .from('user_favorites')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    
+    if (favoritesError) console.error("Erreur favoris:", favoritesError);
+    
+    // Récupérer le nombre total de likes reçus sur les avis
+    const { data: likesData, error: likesError } = await supabase
+      .from('product_reviews')
+      .select('helpful_count')
+      .eq('user_id', userId);
+    
+    if (likesError) console.error("Erreur likes:", likesError);
+    
+    const totalLikes = likesData?.reduce((sum, review) => sum + (review.helpful_count || 0), 0) || 0;
+    
+    // Récupérer le nombre d'avis où l'utilisateur a été le premier
+    const { count: firstReviewsCount, error: firstReviewsError } = await supabase
+      .from('product_reviews')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_first_review', true);
+    
+    if (firstReviewsError) console.error("Erreur first reviews:", firstReviewsError);
+    
+    // Récupérer le nombre de catégories différentes
+    const { data: categoriesData, error: categoriesError } = await supabase
+      .from('product_reviews')
+      .select('product_id')
+      .eq('user_id', userId);
+    
+    // TODO: Implémenter la logique pour compter les catégories uniques
+    // Pour l'instant, on met une valeur par défaut
+    const uniqueCategories = 0;
+    
+    // Calculer le nombre de jours de connexion
+    const accountCreatedDate = new Date(userData.created_at);
+    const daysSinceCreation = Math.floor((new Date() - accountCreatedDate) / (1000 * 60 * 60 * 24));
+    const daysConnected = Math.min(daysSinceCreation, userData.login_streak || 0);
+    
+    // Vérifier si le profil est complet
+    const profileComplete = !!(
+      userData.display_name && 
+      userData.bio && 
+      userData.profile_picture_url
+    );
+    
+    return {
+      success: true,
+      data: {
+        currentStatus: userData.status || 'bronze',
+        totalPointsEarned: userData.points || 0,
+        totalScans: scansCount || 0,
+        totalReviews: reviewsCount || 0,
+        totalFavorites: favoritesCount || 0,
+        totalLikes: totalLikes,
+        firstReviews: firstReviewsCount || 0,
+        categories: uniqueCategories,
+        daysConnected: daysConnected,
+        profileComplete: profileComplete
+      }
+    };
+  } catch (error) {
+    console.error("Erreur lors de la récupération de la progression:", error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
 export default {
+<<<<<<< HEAD
   getUserProgress,
   updateUserStatus,
   recordUserAction,
   getUserRanking,
   STATUS_CONFIG
+=======
+  getActiveUserChallenges,
+  getCompletedUserChallenges,
+  getUserBadges,
+  updateChallengeProgress,
+  getUserLevelInfo,
+  getUserProgress
+>>>>>>> 2a08158ed3439faebfc2602d126eb315f82c366a
 };
