@@ -22,7 +22,8 @@ const useSubscriptionPermissions = () => {
     canAccessFavorites: false,
     canAccessHistory: false,
     canAccessDetailedInfo: false,
-  canAccessNutri: false // Ajout de la propriété
+  canAccessNutri: false, // Ajout de la propriété
+  canAccessEnv: false 
   });
   
   const [loading, setLoading] = useState(true);
@@ -133,13 +134,28 @@ const useSubscriptionPermissions = () => {
       case 'nutrition_info':
       result = userLimits.canAccessNutri;
       break;
+      case 'environnement_info':
+      result = userLimits.canAccessEnv;
+      break;
+      case 'Conseils_de_recyclage':
+      result = userLimits.canAccessEnv;
+      break;
+      case 'Eco-Score_detaille':
+      result = userLimits.canAccessEnv;
+      break;
+      case 'Empreinte_carbone_detaillee':
+      result = userLimits.canAccessEnv;
+      break;
+      case 'Informations_sur_huile_de_palme':
+      result = userLimits.canAccessEnv;
+      break;
       default:
         result = false;
     }
     
-    console.log(`Vérification d'autorisation pour ${actionType}: ${result}`);
-    console.log(`Quotas actuels:`, userQuotas);
-    console.log(`Limites:`, userLimits);
+    //console.log(`Vérification d'autorisation pour ${actionType}: ${result}`);
+    //console.log(`Quotas actuels:`, userQuotas);
+    //console.log(`Limites:`, userLimits);
     
     return result;
   };

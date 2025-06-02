@@ -1,21 +1,36 @@
 // src/pages/SubscriptionSuccess.js
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { checkSubscriptionIntent } from '../services/stripeService';
 import { CheckCircle, Loader } from 'lucide-react';
+import { createWelcomeEssentialSubscription } from '../supabaseClient';
 
 const SubscriptionSuccess = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [subscription, setSubscription] = useState(null);
+  const [welcomeGiftCreated, setWelcomeGiftCreated] = useState(false);
+  
+  // ✅ SOLUTION 1: Utiliser useRef pour suivre si la vérification a déjà été faite
+  const verificationDone = useRef(false);
+  const welcomeGiftProcessed = useRef(false);
+  
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, refreshUserDetails } = useAuth();
 
   useEffect(() => {
     const verifySubscription = async () => {
+      // ✅ Éviter les appels multiples
+      if (verificationDone.current) {
+        console.log("Vérification déjà effectuée, ignorer");
+        return;
+      }
+
       try {
+        verificationDone.current = true; // Marquer comme traité
+        
         // Récupérer l'ID de l'intention d'abonnement depuis l'URL
         const params = new URLSearchParams(location.search);
         const intentId = params.get('intent_id');
@@ -34,29 +49,52 @@ const SubscriptionSuccess = () => {
         // Si l'abonnement est complété, mettre à jour les détails utilisateur
         if (result.completed) {
           setSubscription(result.subscription);
+          
+          // ✅ Créer le cadeau de bienvenue UNE SEULE FOIS
+          if (!welcomeGiftProcessed.current && 
+              result.intent.subscription_plans.name === "Essential") {
+            
+            welcomeGiftProcessed.current = true; // Marquer comme traité
+            
+            try {
+              console.log("Création du cadeau de bienvenue...");
+              const PlanOffert = await createWelcomeEssentialSubscription(
+                result.intent.user_id, 
+                result.intent.plan_id
+              );
+              
+              if (PlanOffert) {
+                setWelcomeGiftCreated(true);
+                console.log("Cadeau de bienvenue Premium créé avec succès");
+              }
+            } catch (giftError) {
+              console.error("Erreur lors de la création du cadeau de bienvenue:", giftError);
+              welcomeGiftProcessed.current = false; // Permettre une nouvelle tentative
+            }
+          }
+          
+          // Rafraîchir les détails utilisateur APRÈS la création du cadeau
           await refreshUserDetails();
         } else {
-          // Si l'abonnement n'est pas encore complété, attendre un webhook Stripe
-          // Ce cas est normal si vous utilisez des webhooks pour confirmer les paiements
           console.log("L'abonnement est en cours de traitement:", result.status);
-          // On considère quand même que c'est un succès pour l'UX
           setSubscription({ status: 'processing' });
         }
       } catch (error) {
         console.error("Erreur lors de la vérification:", error);
         setError(error.message);
+        verificationDone.current = false; // Permettre une nouvelle tentative en cas d'erreur
       } finally {
         setLoading(false);
       }
     };
 
-    if (currentUser) {
+    if (currentUser && !verificationDone.current) {
       verifySubscription();
-    } else {
+    } else if (!currentUser) {
       setError("Vous devez être connecté pour accéder à cette page");
       setLoading(false);
     }
-  }, [currentUser, location, refreshUserDetails]);
+  }, [currentUser, location.search]); // ✅ Dépendances simplifiées
 
   // Rediriger vers le profil après 5 secondes
   useEffect(() => {
@@ -93,11 +131,22 @@ const SubscriptionSuccess = () => {
         <div className="text-center py-8">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-800 mb-2">Merci pour votre abonnement !</h1>
-          <p className="text-gray-600 mb-6">
-            {subscription?.status === 'processing' 
-              ? "Votre abonnement est en cours de traitement. Vous recevrez un email de confirmation bientôt."
-              : "Votre abonnement a bien été activé. Vous pouvez maintenant profiter de toutes les fonctionnalités."}
-          </p>
+          
+          <div className="text-gray-600 mb-6">
+            <p className="mb-2">
+              {subscription?.status === 'processing' 
+                ? "Votre abonnement est en cours de traitement. Vous recevrez un email de confirmation bientôt."
+                : "Votre abonnement a bien été activé. Vous pouvez maintenant profiter de toutes les fonctionnalités."}
+            </p>
+            
+            {verificationDone.current  && welcomeGiftCreated && (
+              <div className="bg-green-100 text-green-800 p-3 rounded-lg mt-3">
+                <p className="font-semibold">🎁 Cadeau de bienvenue !</p>
+                <p className="text-sm">1 semaine d'abonnement Premium offerte pour votre première souscription Essential.</p>
+              </div>
+            )}
+          </div>
+          
           <p className="text-sm text-gray-500">
             Vous allez être redirigé vers votre profil dans quelques secondes...
           </p>

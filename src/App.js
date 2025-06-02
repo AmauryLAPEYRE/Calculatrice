@@ -9,10 +9,12 @@ import Hero from './components/Hero';
 import Concept from './components/Concept';
 import HowItWorks from './components/HowItWorks';
 import TopProducts from './pages/TopProducts'; // Nouvelle page Top Produits
+import TopProductsLive from './pages/TopProductsLive';
 import Download from './components/Download';
 import Features from './components/Features';
 import Footer from './components/Footer';
 import ProductSearchEnhanced from './components/ProductSearchEnhanced';
+import ProfileNavigationTabs from './components/profile/ProfileNavigationTabs';
 // Importer les composants d'administration
 import AdminPanel from './components/admin/AdminPanel';
 import PendingReviews from './components/admin/PendingReviews'; 
@@ -147,6 +149,7 @@ function App() {
             <Route path="/recherche-filtre" element={<ProductSearchEnhanced />} />
 
             <Route path="/top-produits" element={<TopProducts />} /> {/* Nouvelle route pour Top Produits */}
+            <Route path="/top-produits-live" element={<TopProductsLive />} />
             {/* Routes pour les abonnements */}
             <Route path="/abonnements" element={<SubscriptionPlans />} />
             <Route path="/subscribe/:planId" element={
@@ -185,7 +188,12 @@ function App() {
           </Routes>
           </div>
           <Footer />
+                {/* Navigation par onglets en bas d'écran (uniquement sur mobile) */}
+      <div className="md:hidden">
+        <ProfileNavigationTabs />
+      </div>
         </div>
+        
       </Router>
     </AuthProvider>
   );

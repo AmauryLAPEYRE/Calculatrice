@@ -204,7 +204,7 @@ export const getReviewStats = async () => {
     const { count: rejectedCount, error: rejectedError } = await supabase
       .from('product_reviews')
       .select('*', { count: 'exact', head: true })
-      .eq('status', 'rejected');
+      .in('status', ['rejected', 'rejected_ia']);
       
     if (rejectedError) throw rejectedError;
     counts.rejected = rejectedCount || 0;

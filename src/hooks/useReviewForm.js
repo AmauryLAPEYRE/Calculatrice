@@ -1,18 +1,21 @@
-// src/hooks/useReviewForm.js
+// src/hooks/useReviewForm.js (version mise à jour pour allow_public_display)
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   getReviewCriterias, 
   addProductReview
 } from '../services/reviewService';
-import { getReceiptItems } from '../services/receiptAnalysisService';
 import { findBestMatchingItem } from '../utils/textSimilarityUtils';
+import { 
+  getReceiptItems, 
+  updateReceiptItem, 
+  getActiveCountries,
+  updateReceiptAndEnseigne 
+} from '../services/unifiedReceiptService';
 
 /**
  * Hook personnalisé pour gérer la logique du formulaire d'avis
- * @param {object} product - Données du produit
- * @param {function} onSuccess - Callback de succès
- * @returns {object} État et fonctions du formulaire
+ * Version mise à jour pour utiliser allow_public_display
  */
 export const useReviewForm = (product, onSuccess) => {
   const { currentUser, userDetails } = useAuth();
@@ -30,9 +33,11 @@ export const useReviewForm = (product, onSuccess) => {
   const [selectedItem, setSelectedItem] = useState(null);
   
   // États des informations d'achat
-  const [authorizeReceiptSharing, setAuthorizeReceiptSharing] = useState(true);
+  // CHANGEMENT : Remplacer authorizeReceiptSharing par allowPublicDisplay
+  const [allowPublicDisplay, setAllowPublicDisplay] = useState(true);
   const [purchaseDate, setPurchaseDate] = useState('');
   const [purchasePrice, setPurchasePrice] = useState('');
+  const [purchasePriceReceipt, setPurchasePriceReceipt] = useState('');
   const [storeName, setStoreName] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [aiData, setAiData] = useState(null);
@@ -50,7 +55,7 @@ export const useReviewForm = (product, onSuccess) => {
   const [showLowMatchAlert, setShowLowMatchAlert] = useState(false);
   const [showZeroRatingAlert, setShowZeroRatingAlert] = useState(false);
   
-  // Calcul de la note moyenne
+  // Calcul de la note moyenne (inchangé)
   const averageRating = useMemo(() => {
     if (!criterias.length) return 0;
     
@@ -70,7 +75,7 @@ export const useReviewForm = (product, onSuccess) => {
     return Math.round((totalWeightedRating / totalWeight) * 100) / 100;
   }, [ratings, criterias]);
   
-  // Chargement des critères d'évaluation
+  // Chargement des critères d'évaluation (inchangé)
   useEffect(() => {
     const fetchReviewCriterias = async () => {
       const { success, data, error } = await getReviewCriterias();
@@ -93,7 +98,7 @@ export const useReviewForm = (product, onSuccess) => {
     fetchReviewCriterias();
   }, []);
   
-  // Vérifier si des notes sont à zéro
+  // Vérifier si des notes sont à zéro (inchangé)
   useEffect(() => {
     if (criterias.length > 0) {
       const hasZeroRating = criterias.some(criteria => ratings[criteria.id] === 0);
@@ -101,13 +106,15 @@ export const useReviewForm = (product, onSuccess) => {
     }
   }, [ratings, criterias]);
   
-  // Validation du formulaire
+  // Validation du formulaire (inchangé)
   const validateForm = () => {
     const errors = {};
     
     if (!comment.trim()) {
       errors.comment = "Le commentaire est obligatoire";
-    }
+   } else if (comment.trim().length < 20) {
+  errors.comment = "Le commentaire doit contenir au moins 20 caractères";
+}
     
     if (!selectedItem && receiptItems.length > 0) {
       errors.selectedItem = "Vous devez sélectionner un article du ticket";
@@ -122,7 +129,7 @@ export const useReviewForm = (product, onSuccess) => {
     return Object.keys(errors).length === 0;
   };
   
-  // Gestionnaires d'événements
+  // Gestionnaires d'événements (inchangés sauf pour les noms)
   const handleRatingChange = (criteriaId, value) => {
     setRatings(prev => ({
       ...prev,
@@ -145,7 +152,7 @@ export const useReviewForm = (product, onSuccess) => {
   const handleCommentChange = (e) => {
     setComment(e.target.value);
     
-    if (e.target.value.trim()) {
+    if (e.target.value.trim().length >= 20)  {
       setValidationErrors(prev => ({
         ...prev,
         comment: null
@@ -153,6 +160,7 @@ export const useReviewForm = (product, onSuccess) => {
     }
   };
   
+  // Gestionnaire d'upload de ticket (mise à jour)
   const handleReceiptUpload = async (receipt, url, extractedData, receiptItems = []) => {
     setReceiptUploaded(true);
     setReceiptId(receipt.id);
@@ -203,7 +211,9 @@ export const useReviewForm = (product, onSuccess) => {
         }));
       }
     }
-    
+    if(receipt.total_ttc)
+      {setPurchasePriceReceipt(receipt.total_ttc.toString());
+      }
     if (extractedData) {
       console.log("Données extraites par Claude AI:", extractedData);
       setAiData(extractedData);
@@ -211,10 +221,9 @@ export const useReviewForm = (product, onSuccess) => {
       if (extractedData.date) {
         setPurchaseDate(extractedData.date);
       }
-        // NOUVEAU : Extraction du code postal
-        if (extractedData.code_postal) {
-            setPostalCode(extractedData.code_postal);
-            }
+      if (extractedData.code_postal) {
+        setPostalCode(extractedData.code_postal);
+      }
       if (extractedData.store) {
         setStoreName(extractedData.store);
       }
@@ -227,6 +236,7 @@ export const useReviewForm = (product, onSuccess) => {
     }
   };
   
+  // Autres gestionnaires (inchangés)
   const handleReceiptItemsChange = (updatedItems) => {
     setReceiptItems(updatedItems);
     
@@ -280,6 +290,7 @@ export const useReviewForm = (product, onSuccess) => {
     }
   };
   
+  // Gestionnaire de soumission (mise à jour)
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     
@@ -296,13 +307,15 @@ export const useReviewForm = (product, onSuccess) => {
     setError(null);
 
     try {
+      // CHANGEMENT : Utiliser allowPublicDisplay au lieu de authorizeSharing
       const purchaseInfo = {
         price: purchasePrice ? parseFloat(purchasePrice) : null,
+        priceReceipt: purchasePriceReceipt ? parseFloat(purchasePriceReceipt) : null,
         date: purchaseDate || null,
         location: null,
         storeName: storeName || null,
         postalCode: postalCode || null,
-        authorizeSharing: authorizeReceiptSharing,
+        allowPublicDisplay: allowPublicDisplay, // CHANGEMENT ICI
         receiptItems: receiptItems,
         selectedItemId: selectedItem ? selectedItem.id : null,
         matchScore: matchScore
@@ -328,13 +341,11 @@ export const useReviewForm = (product, onSuccess) => {
           }
         }, 2000);
       } else {
-            // Vérifier si c'est une erreur de contrainte d'unicité
-                if  (error && error.includes("duplicate key value violates unique constraint")) {
-                    setError("Vous avez déjà donné votre avis pour ce produit avec ce ticket");
-                   
-                } else {
-                setError(error || "Une erreur est survenue lors de l'envoi de votre avis");
-                }
+        if (error && error.includes("duplicate key value violates unique constraint")) {
+          setError("Vous avez déjà donné votre avis pour ce produit avec ce ticket");
+        } else {
+          setError(error || "Une erreur est survenue lors de l'envoi de votre avis");
+        }
       }
     } catch (err) {
       setError("Une erreur est survenue lors de l'envoi de votre avis");
@@ -354,9 +365,11 @@ export const useReviewForm = (product, onSuccess) => {
     receiptId,
     receiptItems,
     selectedItem,
-    authorizeReceiptSharing,
+    // CHANGEMENT : Exposer allowPublicDisplay au lieu de authorizeReceiptSharing
+    allowPublicDisplay,
     purchaseDate,
     purchasePrice,
+    purchasePriceReceipt,
     storeName,
     postalCode,
     aiData,
@@ -372,10 +385,12 @@ export const useReviewForm = (product, onSuccess) => {
     averageRating,
     
     // Setters
-    setAuthorizeReceiptSharing,
+    // CHANGEMENT : Exposer setAllowPublicDisplay au lieu de setAuthorizeReceiptSharing
+    setAllowPublicDisplay,
     setPurchaseDate,
     setPurchasePrice,
     setStoreName,
+    setPostalCode,
     
     // Gestionnaires
     handleRatingChange,

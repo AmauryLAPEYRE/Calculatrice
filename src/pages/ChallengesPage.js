@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import UserAvatar from '../components/profile/UserAvatar';
 import { 
   Trophy, 
   Star, 
@@ -280,15 +281,22 @@ const ChallengesPage = () => {
             <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
               {/* Avatar et statut */}
               <div className="relative group">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center text-white text-3xl font-bold shadow-lg transform group-hover:scale-105 transition-transform duration-300">
-                  {userDetails?.displayName?.charAt(0).toUpperCase() || 'F'}
-                </div>
+                <UserAvatar 
+                  userId={userDetails?.firebase_uid || currentUser?.uid}
+                  size={96}
+                  status={userDetails?.status || 'bronze'}
+                  displayName={userDetails?.displayName || currentUser?.displayName}
+                  customAvatarUrl={userDetails?.avatarUrl}
+                  avatarSeed={userDetails?.avatarSeed}
+                  className="shadow-lg transform group-hover:scale-105 transition-transform duration-300"
+                  showBorder={true}
+                />
                 {/* Badge de statut avec animation */}
                 <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-2xl animate-bounce-in">
                   {statusLevels[getCurrentStatusIndex()].icon}
                 </div>
                 {/* Effet de brillance */}
-                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-transparent via-white to-transparent opacity-0 group-hover:opacity-20 transform group-hover:rotate-180 transition-all duration-500"></div>
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-transparent via-white to-transparent opacity-0 group-hover:opacity-20 transform group-hover:rotate-180 transition-all duration-500 pointer-events-none"></div>
               </div>
 
               {/* Informations utilisateur */}

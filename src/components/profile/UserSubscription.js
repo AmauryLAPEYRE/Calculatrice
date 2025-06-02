@@ -41,12 +41,13 @@ const UserSubscription = () => {
         if (userError) throw userError;
         
         // 2. Récupérer tous les abonnements actifs de l'utilisateur
-        const { data: subscriptionsData, error: subscriptionsError } = await supabase
-          .from('user_subscriptions')
-          .select('*')
-          .eq('user_id', userData.id)
-          .eq('is_active', true)
-          .order('end_date', { ascending: false });
+const { data: subscriptionsData, error: subscriptionsError } = await supabase
+  .from('user_subscriptions')
+  .select('*, subscription_plans(priority)')
+  .eq('user_id', userData.id)
+  .eq('is_active', true)
+  .order('subscription_plans.priority', { ascending: false })
+  .order('end_date', { ascending: false });
           
         if (subscriptionsError) throw subscriptionsError;
         

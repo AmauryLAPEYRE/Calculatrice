@@ -61,7 +61,7 @@ const FavoriteButton = ({ productCode, productData, size = 'md' }) => {
     }
 
     if (!canUseFavorites) {
-      setError("Fonctionnalité premium");
+      setError("Fonctionnalité Essential");
       setShowError(true);
       setTimeout(() => setShowError(false), 3000);
       return;
@@ -168,7 +168,7 @@ const FavoriteButton = ({ productCode, productData, size = 'md' }) => {
         <div className="absolute top-full mt-3 right-0 bg-gradient-to-r from-red-500 to-red-600 text-white text-sm px-4 py-2 rounded-lg shadow-xl whitespace-nowrap z-20 animate-fadeIn">
           <div className="relative">
             {error}
-            {error === "Fonctionnalité premium" && (
+            {error === "Fonctionnalité Essential" && (
               <Star size={14} className="inline ml-2 text-yellow-300" />
             )}
           </div>

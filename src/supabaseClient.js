@@ -41,6 +41,8 @@ export const syncUserWithSupabase = async (firebaseUser, additionalInfo = {}) =>
       if (additionalInfo.country) updates.country = additionalInfo.country;
       if (additionalInfo.city) updates.city = additionalInfo.city;
       if (additionalInfo.postalCode) updates.postal_code = additionalInfo.postalCode;
+          // Ajouter le champ langue s'il est fourni
+      if (additionalInfo.language) updates.language = additionalInfo.language;
 
       const { data: updatedUser, error: updateError } = await supabase
         .from('users')
@@ -70,8 +72,14 @@ export const syncUserWithSupabase = async (firebaseUser, additionalInfo = {}) =>
         // Ajouter les champs d'adresse s'ils sont fournis
         country: additionalInfo.country || null,
         city: additionalInfo.city || null,
-        postal_code: additionalInfo.postalCode || null
+        postal_code: additionalInfo.postalCode || null,
+        // Ajouter le champ langue s'il est fourni
+        language: additionalInfo.language || 'fr', // Définir français comme langue par défaut
+        // Ajouter les champs avatar
+        avatar_seed: firebaseUser.uid, // Utiliser l'UID comme seed par défaut
+        avatar_url: null // Pas d'avatar personnalisé par défaut
       };
+
 
       const { data: createdUser, error: createError } = await supabase
         .from('users')
@@ -79,7 +87,10 @@ export const syncUserWithSupabase = async (firebaseUser, additionalInfo = {}) =>
         .select('*');
 
       if (createError) throw createError;
-      
+      // Créer automatiquement l'abonnement Essential gratuit d'une semaine
+      if (createdUser && createdUser[0]) {
+        await createWelcomeSubscription(createdUser[0].id);
+      }
       return createdUser[0];
     }
   } catch (error) {
@@ -108,7 +119,6 @@ export const getUserSubscription = async (firebaseUid) => {
       if (userError) throw userError;
       
       // 2. Récupérer tous les abonnements actifs de l'utilisateur
-// Puis utiliser la vue avec un order simple :
 const { data: subscriptionsData, error: subscriptionError } = await supabase
   .from('user_subscriptions_with_plans')
   .select(`
@@ -133,21 +143,29 @@ const { data: subscriptionsData, error: subscriptionError } = await supabase
           plan: highestPrioritySubscription.subscription_plans 
         };
       }
+      // Si aucun abonnement actif, retourner le plan gratuit par défaut
+      const { data: freePlan, error: freePlanError } = await supabase
+        .from('subscription_plans')
+        .select('*')
+        .eq('name', 'Gratuit')
+        .single();
+        
+      if (freePlanError) throw freePlanError;
       
-      // [Reste du code pour le plan gratuit par défaut...]
+      return { subscription: null, plan: freePlan }; 
+      
     } catch (error) {
       console.error('Erreur lors de la récupération de l\'abonnement:', error);
       return { subscription: null, plan: null };
     }
 };
-
 /**
- * Met à jour les informations d'adresse d'un utilisateur
+ * Met à jour les informations d'adresse et de langue d'un utilisateur
  * @param {string} firebaseUid - L'identifiant Firebase de l'utilisateur
- * @param {Object} addressInfo - Les informations d'adresse (country, city, postalCode)
+ * @param {Object} userInfo - Les informations utilisateur (country, city, postalCode, language)
  * @returns {Promise<Object>} - Résultat de l'opération
  */
-export const updateUserAddress = async (firebaseUid, addressInfo) => {
+export const updateUserInfo = async (firebaseUid, userInfo) => {
   if (!firebaseUid) return { success: false, error: 'Identifiant utilisateur requis' };
   
   try {
@@ -165,9 +183,10 @@ export const updateUserAddress = async (firebaseUid, addressInfo) => {
       updated_at: new Date()
     };
     
-    if (addressInfo.country !== undefined) updates.country = addressInfo.country;
-    if (addressInfo.city !== undefined) updates.city = addressInfo.city;
-    if (addressInfo.postalCode !== undefined) updates.postal_code = addressInfo.postalCode;
+    if (userInfo.country !== undefined) updates.country = userInfo.country;
+    if (userInfo.city !== undefined) updates.city = userInfo.city;
+    if (userInfo.postalCode !== undefined) updates.postal_code = userInfo.postalCode;
+    if (userInfo.language !== undefined) updates.language = userInfo.language;
     
     // Mettre à jour l'utilisateur
     const { data, error } = await supabase
@@ -180,9 +199,18 @@ export const updateUserAddress = async (firebaseUid, addressInfo) => {
     
     return { success: true, user: data[0] };
   } catch (error) {
-    console.error('Erreur lors de la mise à jour de l\'adresse:', error);
+    console.error('Erreur lors de la mise à jour des informations utilisateur:', error);
     return { success: false, error: error.message };
   }
+};
+/**
+ * Met à jour les informations d'adresse d'un utilisateur
+ * @param {string} firebaseUid - L'identifiant Firebase de l'utilisateur
+ * @param {Object} addressInfo - Les informations d'adresse (country, city, postalCode)
+ * @returns {Promise<Object>} - Résultat de l'opération
+ */
+export const updateUserAddress = async (firebaseUid, addressInfo) => {
+  return updateUserInfo(firebaseUid, addressInfo);
 };
 
 /**
@@ -227,5 +255,176 @@ export const hasReachedReceiptQuota = async (firebaseUid) => {
   } catch (error) {
     console.error('Erreur lors de la vérification du quota:', error);
     return true; // Par sécurité, considérer le quota comme atteint
+  }
+};
+
+/**
+ * Crée un abonnement Essential gratuit d'une semaine pour les nouveaux utilisateurs
+ * @param {string} userId - L'ID Supabase de l'utilisateur
+ * @returns {Promise<Object>} - L'abonnement créé
+ */
+export const createWelcomeSubscription = async (userId) => {
+  try {
+    // Récupérer le plan Essential
+    const { data: essentialPlan, error: planError } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('name', 'Essential')
+      .eq('is_active', true)
+      .single();
+      
+    if (planError || !essentialPlan) {
+      console.error('Plan Essential non trouvé:', planError);
+      return null;
+    }
+    
+    // Calculer les dates
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 7); // Ajouter 7 jours
+    
+    // Créer l'abonnement
+    const { data: subscription, error: subError } = await supabase
+      .from('user_subscriptions')
+      .insert({
+        user_id: userId,
+        plan_id: essentialPlan.id,
+        billing_cycle: 'monthly', // Requis par la contrainte check
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        is_active: true,
+        status: 'active', // Requis par la contrainte check
+        is_auto_renew: false, // Pas de renouvellement automatique pour l'offre de bienvenue
+        payment_method: 'offert', // Différent de 'stripe' pour indiquer que c'est gratuit
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        metadata: {
+          type: 'offert',
+          description: 'Abonnement Essential offert pendant 7 jours à l\'inscription',
+          original_price: essentialPlan.price_monthly,
+          discount: '100%'
+        }
+      })
+      .select('*');
+      
+    if (subError) {
+      console.error('Erreur lors de la création de l\'abonnement de bienvenue:', subError);
+      return null;
+    }
+    
+    console.log('Abonnement de bienvenue créé avec succès:', subscription[0]);
+    return subscription[0];
+  } catch (error) {
+    console.error('Erreur lors de la création de l\'abonnement de bienvenue:', error);
+    return null;
+  }
+};
+
+export const createWelcomeEssentialSubscription = async (userId, planId) => {
+  try {
+    // Vérifier que le plan souscrit est bien un Essential 
+    const { data: essentialPlan, error: planEssentialError } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('name', 'Essential')
+      .eq('is_active', true)
+      .eq('id', planId)
+      .single(); 
+
+    if (planEssentialError || !essentialPlan) {
+      console.error('Le Plan souscrit n\'est pas Essential :', planEssentialError);
+      return null;
+    }    
+        
+    // Récupérer le plan Premium
+    const { data: premiumPlan, error: planError } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('name', 'Premium')
+      .eq('is_active', true)
+      .single();
+      
+    if (planError || !premiumPlan) {
+      console.error('Plan Premium non trouvé:', planError);
+      return null;
+    }
+
+    // ✅ CORRECTION 1: Vérifier les abonnements Premium existants (sans .single())
+    const { data: existingPremiumSubs, error: userPremiumError } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('plan_id', premiumPlan.id);
+    
+    if (userPremiumError) {
+      console.error('Erreur lors de la vérification des abonnements Premium:', userPremiumError);
+      return null;
+    }
+
+    // ✅ CORRECTION 2: Vérifier si l'utilisateur a déjà eu ou a un Premium
+    if (existingPremiumSubs && existingPremiumSubs.length > 0) {
+      console.log('L\'utilisateur a déjà eu un abonnement Premium:', existingPremiumSubs);
+      return null;
+    }
+
+    // ✅ CORRECTION 3: Vérifier s'il y a déjà un abonnement Premium actif (sécurité supplémentaire)
+    const { data: activePremiumSubs, error: activePremiumError } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('plan_id', premiumPlan.id)
+      .eq('is_active', true)
+      .eq('status', 'active');
+
+    if (activePremiumError) {
+      console.error('Erreur lors de la vérification des abonnements Premium actifs:', activePremiumError);
+      return null;
+    }
+
+    if (activePremiumSubs && activePremiumSubs.length > 0) {
+      console.log('L\'utilisateur a déjà un abonnement Premium actif:', activePremiumSubs);
+      return null;
+    }
+
+    // Calculer les dates
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 7); // Ajouter 7 jours
+    
+    // Créer l'abonnement
+    const { data: subscription, error: subError } = await supabase
+      .from('user_subscriptions')
+      .insert({
+        user_id: userId,
+        plan_id: premiumPlan.id,
+        billing_cycle: 'monthly',
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        is_active: true,
+        status: 'active',
+        is_auto_renew: false,
+        payment_method: 'offert',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        metadata: {
+          type: 'welcome_offer',  // ✅ Plus descriptif
+          description: 'Abonnement Premium offert pendant 7 jours à l\'inscription',
+          original_price: premiumPlan.price_monthly,
+          discount: '100%'
+        }
+      })
+      .select('*');
+      
+    if (subError) {
+      console.error('Erreur lors de la création de l\'abonnement de bienvenue:', subError);
+      return null;
+    }
+    
+    console.log('Abonnement de bienvenue Premium créé avec succès:', subscription[0]);
+    return subscription[0];
+
+  } catch (error) {
+    console.error('Erreur lors de la création de l\'abonnement de bienvenue:', error);
+    return null;
   }
 };

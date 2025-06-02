@@ -69,7 +69,12 @@ const SubscriptionPayment = () => {
     try {
       setProcessing(true);
       setError(null);
+    
 
+
+
+
+      
       // Création de l'abonnement Stripe avec le cycle de facturation standardisé
       const result = await createSubscription(
         paymentMethodId, 

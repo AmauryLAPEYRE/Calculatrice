@@ -7,7 +7,8 @@ import {
   History, 
   Star, 
   Heart,
-  Receipt
+  Receipt,
+  MessageSquare
 } from 'lucide-react';
 
 /**
@@ -27,7 +28,7 @@ const ProfileNavigationTabs = () => {
     { path: '/edit-profile', icon: <Settings size={20} />, label: 'Paramètres' },
     { path: '/historique-produits', icon: <History size={20} />, label: 'Historique' },
     { path: '/mes-favoris', icon: <Heart size={20} />, label: 'Favoris' },
-    { path: '/mes-avis', icon: <Star size={20} />, label: 'Avis' },
+    { path: '/mes-avis', icon: <MessageSquare size={20} />, label: 'Avis' },
     { path: '/mes-tickets', icon: <Receipt size={20} />, label: 'Tickets' },
   ];
   

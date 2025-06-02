@@ -163,7 +163,7 @@ const SubscriptionHistory = () => {
       return (
         <span className="flex items-center text-orange-600 status-badge">
           <Ban className="h-4 w-4 mr-1" />
-          Annulé
+          Annulé par l'utilisateur.
         </span>
       );
     } else if (subscription.is_active && now <= endDate) {
@@ -237,7 +237,7 @@ const SubscriptionHistory = () => {
     // Si l'abonnement est annulé mais encore actif, utiliser une bordure orange
     if (subscription.cancellation_date) {
       return 'border-l-4 border-orange-500';
-    } else if (subscription.payment_method === 'offert') {
+    } else if (subscription.payment_method === 'offert' ) {
       return 'border-l-4 border-purple-500';
     } else {
       return 'border-l-4 border-green-500';
@@ -529,7 +529,7 @@ const SubscriptionHistory = () => {
                           {/* Badge "annulé" si l'abonnement est annulé mais encore actif */}
                           {isActive && isCancelled && (
                             <span className="ml-3 px-2 py-0.5 rounded text-xs font-medium bg-orange-200 text-orange-800">
-                              Annulé le {formatDate(subscription.cancellation_date)}
+                              Abonnement annulé le {formatDate(subscription.cancellation_date)} – reste actif jusqu’au {formatDate(subscription.end_date)}
                             </span>
                           )}
                         </div>

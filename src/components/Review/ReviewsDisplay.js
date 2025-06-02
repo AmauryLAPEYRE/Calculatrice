@@ -22,6 +22,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import UserAvatar from '../profile/UserAvatar';
 import { 
   toggleReviewLike,
   checkUserLike,
@@ -178,158 +179,40 @@ const ReviewsDisplay = ({
 
   return (
     <div className="space-y-8">
-      {/* Hero Section des Avis */}
-      <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-white rounded-3xl p-8 shadow-xl border border-green-100">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
-          {/* Statistiques principales */}
-          <div className="flex-1">
-            <div className="flex items-center gap-6 mb-6">
-              {/* Note principale GÉANTE */}
-              <div className="text-center">
-                <div className="text-6xl font-bold text-green-800 mb-2">
-                  {averageRating.toFixed(2)}
-                </div>
-                <div className="flex justify-center mb-2">
-                  {renderPreciseStars(averageRating, 28)}
-                </div>
-                <p className="text-green-600 font-medium">
-                  {totalReviews} avis au total
-                </p>
-              </div>
 
-              {/* Badges de confiance */}
-              <div className="space-y-3">
-                {verifiedReviews > 0 && (
-                  <div className="flex items-center bg-green-100 px-4 py-2 rounded-full">
-                    <CheckCircle size={20} className="text-green-600 mr-2" />
-                    <span className="font-medium text-green-800">
-                      {verifiedReviews} avis vérifiés
-                    </span>
-                  </div>
-                )}
-
-                {totalReviews > 10 && (
-                  <div className="flex items-center bg-amber-100 px-4 py-2 rounded-full animate-pulse">
-                    <TrendingUp size={20} className="text-amber-600 mr-2" />
-                    <span className="font-medium text-amber-800">
-                      Produit populaire
-                    </span>
-                  </div>
-                )}
-
-                {product.total_favorites > 0 && (
-                  <div className="flex items-center bg-pink-100 px-4 py-2 rounded-full">
-                    <Heart size={20} className="text-pink-600 fill-pink-600 mr-2" />
-                    <span className="font-medium text-pink-800">
-                      {product.total_favorites} favoris
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Notes détaillées avec barres de progression */}
-            {showDetailedRatings && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {product.taste_rating > 0 && (
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">Goût</span>
-                      <span className="text-lg font-bold text-green-700">
-                        {product.taste_rating.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
-                      <div 
-                        className="bg-gradient-to-r from-green-400 to-green-600 h-2.5 rounded-full transition-all duration-500"
-                        style={{ width: `${(product.taste_rating / 5) * 100}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                )}
-
-                {product.quantity_rating > 0 && (
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">Quantité</span>
-                      <span className="text-lg font-bold text-amber-700">
-                        {product.quantity_rating.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
-                      <div 
-                        className="bg-gradient-to-r from-amber-400 to-amber-600 h-2.5 rounded-full transition-all duration-500"
-                        style={{ width: `${(product.quantity_rating / 5) * 100}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                )}
-
-                {product.price_rating > 0 && (
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">Prix</span>
-                      <span className="text-lg font-bold text-blue-700">
-                        {product.price_rating.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
-                      <div 
-                        className="bg-gradient-to-r from-blue-400 to-blue-600 h-2.5 rounded-full transition-all duration-500"
-                        style={{ width: `${(product.price_rating / 5) * 100}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Historique des prix */}
-            {product.average_price > 0 && (
-              <div className="mt-6">
-                <PriceHistory 
-                  productCode={product.code} 
-                  averagePrice={product.average_price} 
-                />
-              </div>
-            )}
-          </div>
-
-          {/* CTA pour donner son avis */}
-          <div className="text-center">
-            <button
-              onClick={onAddReviewClick}
-              className={`group bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 flex items-center ${
-                buttonState.disabled ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-              disabled={buttonState.disabled}
-              title={buttonState.tooltip || ''}
-            >
-              <MessageSquare size={24} className="mr-3" />
-              <span className="text-lg">{buttonState.message || "Donner mon avis"}</span>
-              <Sparkles size={16} className="ml-2 animate-pulse" />
-            </button>
-
-            {!currentUser && (
-              <p className="text-sm text-gray-500 mt-3">
-                Connectez-vous pour partager votre expérience
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Section des avis */}
+      
       <div>
-        <h3 className="text-2xl font-bold text-green-800 mb-6 flex items-center">
-          <MessageSquare size={28} className="mr-3 text-green-600" />
-          Avis des utilisateurs
-          {totalReviews > 0 && (
-            <span className="ml-3 text-lg font-normal text-gray-600">
-              ({totalReviews} avis)
-            </span>
-          )}
-        </h3>
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+          {/* Avis utilsiateur*/}
+          <div className="flex text-center">
+              <h3 className="text-2xl font-bold text-green-800 mb-4 flex items-center">
+            <MessageSquare size={28} className="mr-3 text-green-600" />
+            Avis des utilisateurs
+            {totalReviews > 0 && (
+              <span className="ml-3 text-lg font-normal text-gray-600">
+                ({totalReviews} avis)
+              </span>
+            )}
+            </h3>
+          </div>
+          {/* Bouton Donner mon avis*/}
+          <div className="flex text-center mb-4">
+                      <button
+                onClick={onAddReviewClick}
+                className={`group bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 flex items-center ${
+                  buttonState.disabled ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                disabled={buttonState.disabled}
+                title={buttonState.tooltip || ''}
+              >
+                <MessageSquare size={24} className="mr-3" />
+                <span className="text-lg">{buttonState.message || "Donner mon avis"}</span>
+                <Sparkles size={16} className="ml-2 animate-pulse" />
+              </button>
+          </div>
+        </div>
 
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start animate-fadeIn">
@@ -368,16 +251,28 @@ const ReviewsDisplay = ({
                 } p-6`}>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center">
-                      {/* Avatar utilisateur cliquable */}
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4 ${
-                          review.review_source === 'ai'
-                            ? 'bg-gradient-to-br from-red-400 to-red-600' // Avatar rouge pour IA
-                            : 'bg-gradient-to-br from-green-400 to-green-600 cursor-pointer hover:from-green-500 hover:to-green-700 transition-all transform hover:scale-110 hover-pulse' // Avatar vert cliquable pour utilisateurs
-                        }`}
-                        onClick={() => review.review_source !== 'ai' && handleUserClick(review)}
+                      {/* Avatar utilisateur avec UserAvatar ou emoji robot pour IA */}
+                      {review.review_source === 'ai' ? (
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center text-white font-bold text-lg mr-4">
+                          🤖
+                        </div>
+                      ) : (
+                        <div 
+                          className="mr-4 cursor-pointer"
+                          onClick={() => handleUserClick(review)}
                         >
-                          {review.review_source === 'ai' ? '🤖' : review.user_name.charAt(0).toUpperCase()}
-                        </div>                      
+                          <UserAvatar 
+                            userId={review.user_firebase_uid || `user-${review.user_id}`}
+                            size={48}
+                            status={review.user_status || 'bronze'}
+                            displayName={review.user_name}
+                            customAvatarUrl={review.user_avatar_url}
+                            avatarSeed={review.user_avatar_seed || review.user_firebase_uid || `user-${review.user_id}`}
+                            className="hover:scale-110 transition-transform duration-300 shadow-md"
+                            showBorder={true}
+                          />
+                        </div>
+                      )}
                       <div>
                         <div className="flex items-center gap-3">
                           <h4 

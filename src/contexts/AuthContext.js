@@ -39,9 +39,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Fonction pour s'inscrire avec email/mot de passe
-  const signup = async (email, password, displayName, addressInfo = {}) => {
+  const signup = async (email, password, displayName, userInfo = {}) => {
     try {
-      const user = await registerUser(email, password, displayName, addressInfo);
+      const user = await registerUser(email, password, displayName, userInfo);
       return user;
     } catch (error) {
       setError(error.message);
@@ -91,7 +91,11 @@ export const AuthProvider = ({ children }) => {
     try {
       // Synchroniser l'utilisateur avec Supabase
       const supabaseUser = await syncUserWithSupabase(firebaseUser);
-      
+      // Récupérer les informations d'abonnement
+      const { subscription: userSubscription, plan } = await getUserSubscription(firebaseUser.uid);
+      setSubscription(userSubscription);
+      setSubscriptionPlan(plan);
+
       if (supabaseUser) {
         setUserDetails({
           id: supabaseUser.id,
@@ -107,24 +111,109 @@ export const AuthProvider = ({ children }) => {
           scanCount: supabaseUser.scan_count || 0,
           status: supabaseUser.status || 'bronze',
           isSuspended: supabaseUser.is_suspended || false,
-          subscription_name: supabaseUser.subscription_name || 'Gratuit',
+        subscription_name: userSubscription?.plan_name || plan?.name || 'Gratuit',
+          //subscription_name: supabaseUser.subscription_name || 'Gratuit',
           // Ajouter les nouveaux champs d'adresse
           country: supabaseUser.country || '',
           city: supabaseUser.city || '',
           postalCode: supabaseUser.postal_code || '',
+          // Ajouter le nouveau champ langue
+          language: supabaseUser.language || 'fr',
           // Ajouter le champ pour savoir si c'est un utilisateur Google
           authProvider: supabaseUser.auth_provider || 'email',
-          photoURL: supabaseUser.photo_url || null
+          photoURL: supabaseUser.photo_url || null,
+          // NOUVEAUX CHAMPS POUR L'AVATAR
+          firebase_uid: firebaseUser.uid, // Important pour UserAvatar
+          avatarUrl: supabaseUser.avatar_url || null,
+          avatarSeed: supabaseUser.avatar_seed || firebaseUser.uid, // Utilise l'UID comme seed par défaut
         });
         
-        // Récupérer les informations d'abonnement
-        const { subscription: userSubscription, plan } = await getUserSubscription(firebaseUser.uid);
-        setSubscription(userSubscription);
-        setSubscriptionPlan(plan);
+
       }
     } catch (error) {
       console.error("Erreur lors de la récupération des détails utilisateur:", error);
       setError("Impossible de récupérer les détails de votre compte.");
+    }
+  };
+
+  // Fonction pour obtenir le nom du pays depuis le code
+  const getCountryName = (countryCode, language = 'fr') => {
+    // Cette fonction devrait normalement interroger la base de données
+    // Pour l'exemple, on utilise un mapping simple
+    const countryNames = {
+      'FR': { fr: 'France', en: 'France' },
+      'BE': { fr: 'Belgique', en: 'Belgium' },
+      'CH': { fr: 'Suisse', en: 'Switzerland' },
+      'CA': { fr: 'Canada', en: 'Canada' },
+      'LU': { fr: 'Luxembourg', en: 'Luxembourg' },
+      'DE': { fr: 'Allemagne', en: 'Germany' },
+      'IT': { fr: 'Italie', en: 'Italy' },
+      'ES': { fr: 'Espagne', en: 'Spain' },
+      'PT': { fr: 'Portugal', en: 'Portugal' },
+      'NL': { fr: 'Pays-Bas', en: 'Netherlands' },
+      'GB': { fr: 'Royaume-Uni', en: 'United Kingdom' },
+      'US': { fr: 'États-Unis', en: 'United States' },
+      'MA': { fr: 'Maroc', en: 'Morocco' },
+      'DZ': { fr: 'Algérie', en: 'Algeria' },
+      'TN': { fr: 'Tunisie', en: 'Tunisia' },
+      'SN': { fr: 'Sénégal', en: 'Senegal' },
+      'CI': { fr: 'Côte d\'Ivoire', en: 'Ivory Coast' },
+      'CM': { fr: 'Cameroun', en: 'Cameroon' }
+    };
+
+    return countryNames[countryCode]?.[language] || countryCode;
+  };
+
+  // Fonction pour obtenir le nom de la langue
+  const getLanguageName = (languageCode, displayLanguage = 'fr') => {
+    const languageNames = {
+      'fr': { fr: 'Français', en: 'French', native: 'Français' },
+      'en': { fr: 'Anglais', en: 'English', native: 'English' },
+      'es': { fr: 'Espagnol', en: 'Spanish', native: 'Español' },
+      'de': { fr: 'Allemand', en: 'German', native: 'Deutsch' },
+      'it': { fr: 'Italien', en: 'Italian', native: 'Italiano' },
+      'pt': { fr: 'Portugais', en: 'Portuguese', native: 'Português' },
+      'nl': { fr: 'Néerlandais', en: 'Dutch', native: 'Nederlands' },
+      'ar': { fr: 'Arabe', en: 'Arabic', native: 'العربية' }
+    };
+
+    return languageNames[languageCode]?.[displayLanguage] || 
+           languageNames[languageCode]?.native || 
+           languageCode;
+  };
+
+  // Nouvelle fonction pour récupérer les données de pays et langues depuis la base
+  const getCountryFromDatabase = async (countryCode, language = 'fr') => {
+    try {
+      const { data, error } = await supabase
+        .from('countries')
+        .select(`name_${language}`)
+        .eq('code', countryCode)
+        .eq('is_active', true)
+        .single();
+      
+      if (error) throw error;
+      return data?.[`name_${language}`] || countryCode;
+    } catch (error) {
+      console.error('Erreur lors de la récupération du pays:', error);
+      return getCountryName(countryCode, language);
+    }
+  };
+
+  const getLanguageFromDatabase = async (languageCode, displayLanguage = 'fr') => {
+    try {
+      const { data, error } = await supabase
+        .from('languages')
+        .select(`name_${displayLanguage}, name_native`)
+        .eq('code', languageCode)
+        .eq('is_active', true)
+        .single();
+      
+      if (error) throw error;
+      return data?.[`name_${displayLanguage}`] || data?.name_native || languageCode;
+    } catch (error) {
+      console.error('Erreur lors de la récupération de la langue:', error);
+      return getLanguageName(languageCode, displayLanguage);
     }
   };
 
@@ -273,6 +362,10 @@ export const AuthProvider = ({ children }) => {
     hasActiveSubscription,
     canPerformAction,
     refreshUserDetails: () => fetchUserDetails(currentUser),
+    getCountryName,    // Fonction statique (compatibilité)
+    getLanguageName,   // Fonction statique (compatibilité)
+    getCountryFromDatabase,   // NOUVELLE FONCTION - Depuis la base
+    getLanguageFromDatabase,  // NOUVELLE FONCTION - Depuis la base
     isAdmin
   };
 

@@ -2,8 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { Edit, Check, X, Trash, ShoppingCart, Plus, Star } from 'lucide-react';
 import { calculateMatchScore } from '../utils/textSimilarityUtils';
-import { updateReceiptItem, deleteReceiptItem } from '../services/receiptAnalysisService';
+import { deleteReceiptItem } from '../services/receiptAnalysisService';
 import { supabase } from '../supabaseClient';
+import { 
+  getReceiptItems, 
+  updateReceiptItem, 
+  getActiveCountries,
+  updateReceiptAndEnseigne 
+} from '../services/unifiedReceiptService';
 
 /**
  * Composant permettant d'afficher et de sélectionner les articles du ticket de caisse
@@ -64,7 +70,7 @@ const ReceiptItemSelector = ({ items = [], onChange, selectedItem, onSelect, pro
       // Créer un objet indexé par ID d'article
       const linkedItemsMap = {};
       reviews.forEach(review => {
-        if (review.receipt_item_id) {
+        if (review.receipt_item_id && (review.status === 'approved' || review.status === 'approved_auto')) {
           linkedItemsMap[review.receipt_item_id] = true;
         }
       });
@@ -326,14 +332,30 @@ const ReceiptItemSelector = ({ items = [], onChange, selectedItem, onSelect, pro
 
   return (
     <div className="mt-4">
-      <div className="flex justify-between items-center mb-2">
-        <h4 className="font-medium text-gray-800">
+      {/* Article sélectionné - Version mobile simplifiée */}
+      {selectedItem && (
+        <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="text-sm font-medium text-blue-900">Article sélectionné</div>
+              <div className="text-xs text-blue-700">{selectedItem.designation}</div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs text-blue-600">{(selectedItem.prix_unitaire || 0).toFixed(2)} €</span>
+                {productName && selectedItem.matchScore && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${getMatchScoreClass(selectedItem.matchScore)}`}>
+                    {Math.round(selectedItem.matchScore * 100)}% correspondance
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* En-tête simplifié */}
+      <div className="flex justify-between items-center mb-3">
+        <h4 className="font-medium text-gray-800 text-sm">
           Articles du ticket ({receiptItems.length})
-          {receiptItems.length > 7 && 
-            <span className="text-xs text-gray-500 ml-2">
-              (Faites défiler pour voir tous les articles)
-            </span>
-          }
         </h4>
         <button
           type="button"
@@ -342,194 +364,172 @@ const ReceiptItemSelector = ({ items = [], onChange, selectedItem, onSelect, pro
           disabled={!receiptItems.some(item => item.receipt_id)}
         >
           <Plus size={16} className="mr-1" />
-          Ajouter un article
+          Ajouter
         </button>
       </div>
       
       {receiptItems.length === 0 ? (
         <div className="text-center py-4 bg-gray-50 rounded-md">
           <ShoppingCart className="mx-auto h-8 w-8 text-gray-400" />
-          <p className="mt-2 text-sm text-gray-500">Aucun article détecté sur ce ticket</p>
+          <p className="mt-2 text-sm text-gray-500">Aucun article détecté</p>
         </div>
       ) : (
-        <div className="overflow-y-auto max-h-[600px] border border-gray-200 rounded-md" style={{ scrollbarWidth: 'none' }}>
-          <style jsx="true">{`
-            /* Masquer la barre de défilement pour tous les navigateurs */
-            div::-webkit-scrollbar {
-              display: none;
-            }
-            div {
-              -ms-overflow-style: none;
-              scrollbar-width: none;
-            }
-          `}</style>
-          <table className="min-w-full divide-y divide-gray-200 table-fixed">
-            <thead className="bg-gray-50 sticky top-0 z-10">
-              <tr>
-                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-7/12">
-                  Désignation
-                </th>
-                <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-2/12">
-                  Prix
-                </th>
-                {productName && (
-                  <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">
-                    Match
-                  </th>
-                )}
-                <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-2/12">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {receiptItems.map((item, index) => (
-                <tr 
-                  key={item.id || index} 
-                  className={`${getRowStyle(item)} transition-colors`}
-                  onClick={() => handleSelectItem(item)}
-                >
-                  {editingItemId === item.id ? (
-                    // Mode édition
-                    <>
-                      <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          value={editValues.designation || ''}
-                          onChange={(e) => handleEditChange('designation', e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex flex-col space-y-2">
-                          <div className="flex items-center">
-                            <span className="text-xs text-gray-500 mr-1">Qté:</span>
-                            <input
-                              type="number"
-                              value={editValues.quantite || ''}
-                              onChange={(e) => handleEditChange('quantite', e.target.value)}
-                              className="w-12 px-2 py-1 border border-gray-300 rounded-md text-sm text-center"
-                              step="0.01"
-                              min="0"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </div>
-                          <div className="flex items-center">
-                            <span className="text-xs text-gray-500 mr-1">Prix:</span>
-                            <input
-                              type="number"
-                              value={editValues.prix_unitaire || ''}
-                              onChange={(e) => handleEditChange('prix_unitaire', e.target.value)}
-                              className="w-16 px-2 py-1 border border-gray-300 rounded-md text-sm text-right"
-                              step="0.01"
-                              min="0"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <span className="ml-1">€</span>
-                          </div>
-                          <div className="flex items-center">
-                            <span className="text-xs text-gray-500 mr-1">Total:</span>
-                            <input
-                              type="number"
-                              value={editValues.prix_total || ''}
-                              onChange={(e) => handleEditChange('prix_total', e.target.value)}
-                              className="w-16 px-2 py-1 border border-gray-300 rounded-md text-sm text-right"
-                              step="0.01"
-                              min="0"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <span className="ml-1">€</span>
-                          </div>
-                        </div>
-                      </td>
-                      {productName && <td className="px-3 py-2"></td>}
-                      <td className="px-3 py-2 text-center">
-                        <div className="flex items-center justify-center space-x-2">
-                          <button
-                            type="button"
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              saveEditing(item.id); 
-                            }}
-                            className="text-green-600 hover:text-green-900 p-1"
-                          >
-                            <Check size={16} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              cancelEditing(); 
-                            }}
-                            className="text-red-600 hover:text-red-900 p-1"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </>
-                  ) : (
-                    // Mode affichage
-                   <>
-                    <td className="px-3 py-2 text-sm text-gray-800 flex items-center">
-                      {linkedItems[item.id] && (
-                        <div className="mr-2 bg-blue-100 text-blue-800 rounded-full p-1" title="Article déjà associé à un avis">
-                          <Star size={12} className="fill-blue-800" />
-                        </div>
-                      )}
-                      <span className={linkedItems[item.id] ? "line-through text-gray-500" : ""}>
-                        {item.designation || 'Sans nom'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-sm text-center text-gray-800 font-medium">
-                      {(item.prix_unitaire || 0).toFixed(2)} €
-                    </td>
-                    {productName && (
-                      <td className="px-3 py-2 text-sm text-center">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${getMatchScoreClass(item.matchScore || 0)}`}>
-                          {Math.round((item.matchScore || 0) * 100)}%
-                        </span>
-                      </td>
-                    )}
-                    <td className="px-3 py-2 text-center">
-                      <div className="flex items-center justify-center space-x-2" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startEditing(item);
-                          }}
-                          className="text-blue-600 hover:text-blue-900 p-1"
-                          disabled={linkedItems[item.id]}
-                          title={linkedItems[item.id] ? "Cet article est déjà associé à un avis" : "Modifier"}
-                        >
-                          <Edit size={16} className={linkedItems[item.id] ? "opacity-50" : ""} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteItem(item.id);
-                          }}
-                          className="text-red-600 hover:text-red-900 p-1"
-                          disabled={linkedItems[item.id]}
-                          title={linkedItems[item.id] ? "Cet article est déjà associé à un avis" : "Supprimer"}
-                        >
-                          <Trash size={16} className={linkedItems[item.id] ? "opacity-50" : ""} />
-                        </button>
-                      </div>
-                    </td>
-                  </>
+        /* Liste des articles - Format mobile optimisé */
+        <div className="space-y-2">
+          {receiptItems.map((item, index) => (
+            <div 
+              key={item.id || index} 
+              className={`${getRowStyle(item)} transition-colors p-3 rounded-lg ${
+                selectedItem && selectedItem.id === item.id ? 'ring-2 ring-green-500' : ''
+              }`}
+              onClick={() => handleSelectItem(item)}
+            >
+              {/* Mode affichage - Format mobile amélioré */}
+              <div className="space-y-2">
+                {/* Nom du produit sur toute la largeur */}
+                <div className="flex items-start w-full">
+                  {linkedItems[item.id] && (
+                    <Star size={14} className="mr-2 text-blue-500 fill-blue-500 flex-shrink-0 mt-0.5" />
                   )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  <span className={`text-sm font-medium leading-tight ${linkedItems[item.id] ? "line-through text-gray-500" : "text-gray-900"}`}>
+                    {item.designation || 'Sans nom'}
+                  </span>
+                </div>
+                
+                {/* Prix, score et boutons sur la même ligne */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold text-gray-700">
+                      {(item.prix_unitaire || 0).toFixed(2)} €
+                    </span>
+                    {productName && item.matchScore && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${getMatchScoreClass(item.matchScore)}`}>
+                        {Math.round(item.matchScore * 100)}%
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEditing(item);
+                      }}
+                      className="p-2 text-blue-600 hover:text-blue-900"
+                      disabled={linkedItems[item.id]}
+                    >
+                      <Edit size={14} className={linkedItems[item.id] ? "opacity-50" : ""} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteItem(item.id);
+                      }}
+                      className="p-2 text-red-600 hover:text-red-900"
+                      disabled={linkedItems[item.id]}
+                    >
+                      <Trash size={14} className={linkedItems[item.id] ? "opacity-50" : ""} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
-      <div className="mt-2 text-right text-xs text-gray-500 italic">
-        Cliquez sur un article pour le sélectionner, ou sur les icônes pour modifier ou supprimer
+      
+      {/* Modale d'édition */}
+      {editingItemId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">
+                {editValues.designation === "Nouvel article" ? "Ajouter un article" : "Modifier l'article"}
+              </h3>
+            </div>
+            
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Désignation
+                </label>
+                <input
+                  type="text"
+                  value={editValues.designation || ''}
+                  onChange={(e) => handleEditChange('designation', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Nom de l'article"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Quantité
+                  </label>
+                  <input
+                    type="number"
+                    value={editValues.quantite || ''}
+                    onChange={(e) => handleEditChange('quantite', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-center focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    step="0.01"
+                    min="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Prix unitaire (€)
+                  </label>
+                  <input
+                    type="number"
+                    value={editValues.prix_unitaire || ''}
+                    onChange={(e) => handleEditChange('prix_unitaire', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    step="0.01"
+                    min="0"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Prix total (€)
+                </label>
+                <input
+                  type="number"
+                  value={editValues.prix_total || ''}
+                  onChange={(e) => handleEditChange('prix_total', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={cancelEditing}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => saveEditing(receiptItems.find(item => item.id === editingItemId)?.id)}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <div className="mt-3 text-xs text-gray-500 text-center">
+        Touchez un article pour le sélectionner
       </div>
     </div>
   );

@@ -244,6 +244,7 @@ export const checkFavoritesPermission = async (userId) => {
       `)
       .eq('user_id', userId)
       .eq('is_active', true)
+      .order('subscription_plans.priority', { ascending: false })
       .order('end_date', { ascending: false })
       .limit(1)
       .single();

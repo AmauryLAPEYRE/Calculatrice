@@ -4,6 +4,58 @@ import { storage } from '../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 /**
+ * Parse en sécurité les champs JSON stockés en string
+ * @param {string} jsonString - String JSON à parser
+ * @param {*} defaultValue - Valeur par défaut si le parsing échoue
+ * @returns {*} - Objet parsé ou valeur par défaut
+ */
+const safeJsonParse = (jsonString, defaultValue = null) => {
+  try {
+    if (!jsonString || jsonString === 'null' || jsonString === 'undefined') {
+      return defaultValue;
+    }
+    
+    // Si c'est déjà un objet/array, le retourner tel quel
+    if (typeof jsonString === 'object') {
+      return jsonString;
+    }
+    
+    // Parser la string JSON
+    return JSON.parse(jsonString);
+  } catch (error) {
+    console.warn('Erreur lors du parsing JSON:', error.message, 'Data:', jsonString);
+    return defaultValue;
+  }
+};
+/**
+ * Parse les champs JSON d'un produit récupéré de la base de données
+ * @param {object} product - Produit brut de la base de données
+ * @returns {object} - Produit avec champs JSON parsés
+ */
+const parseProductJsonFields = (product) => {
+  if (!product) return product;
+
+  return {
+    ...product,
+    // Parser le champ nutriments (objet JSON)
+    nutriments: safeJsonParse(product.nutriments, {}),
+    
+    // Parser le champ ecoscore_data (objet JSON)
+    ecoscore_data: safeJsonParse(product.ecoscore_data, {}),
+    
+    // Parser le champ additives_tags (tableau JSON)
+    additives_tags: safeJsonParse(product.additives_tags, []),
+    
+    // Autres champs qui pourraient être des JSON
+    allergens_tags: safeJsonParse(product.allergens_tags, []),
+    traces_tags: safeJsonParse(product.traces_tags, []),
+    categories_tags: safeJsonParse(product.categories_tags, []),
+    labels_tags: safeJsonParse(product.labels_tags, []),
+    ingredients_analysis_tags: safeJsonParse(product.ingredients_analysis_tags, []),
+  };
+};
+
+/**
  * Recherche un produit dans la base de données locale
  * @param {string} productCode - Code-barres du produit
  * @returns {Promise<object>} - Résultat de la recherche
@@ -26,11 +78,13 @@ export const findProductInDatabase = async (productCode) => {
     if (error && error.code !== 'PGRST116') { // PGRST116 = "No rows returned"
       throw error;
     }
-    
+       // Parser les champs JSON du produit
+    const parsedProduct = data ? parseProductJsonFields(data) : null;
+
     return { 
       success: true, 
       exists: !!data,
-      product: data 
+      product: parsedProduct  
     };
   } catch (error) {
     console.error("Erreur lors de la recherche du produit:", error.message);
@@ -124,7 +178,12 @@ const formatProductDataForDatabase = (apiProduct) => {
     is_vegetarian: getBooleanValue(getValue(apiProduct, 'ingredients_analysis.vegetarian')),
     vegetarian_status: getValue(apiProduct, 'ingredients_analysis.vegetarian'),
     is_vegan: getBooleanValue(getValue(apiProduct, 'ingredients_analysis.vegan')),
-    vegan_status: getValue(apiProduct, 'ingredients_analysis.vegan')
+    vegan_status: getValue(apiProduct, 'ingredients_analysis.vegan'),
+    nutriments: getValue(apiProduct, 'nutriments'),
+    ecoscore_data: getValue(apiProduct, 'ecoscore_data'),
+    additives_tags: getValue(apiProduct, 'additives_tags'),
+    ingredients_analysis_tags: getValue(apiProduct, 'ingredients_analysis_tags'),
+    ingredients_text_with_allergens_fr: getValue(apiProduct, 'ingredients_text_with_allergens_fr')
   };
 };
 

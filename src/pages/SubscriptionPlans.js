@@ -33,6 +33,8 @@ const SubscriptionPlans = () => {
   const { currentUser, subscriptionPlan } = useAuth();
   const [currentPlanId, setCurrentPlanId] = useState(null);
   const navigate = useNavigate();
+// 1. Ajouter un state pour tracker si le plan actuel est offert
+const [isCurrentPlanOffered, setIsCurrentPlanOffered] = useState(false);
 
   // Déclencher les animations au chargement
   useEffect(() => {
@@ -40,103 +42,87 @@ const SubscriptionPlans = () => {
     setTimeout(() => setAnimationDone(true), 100);
   }, []);
 
-  useEffect(() => {
-    const fetchSubscriptionPlans = async () => {
+// 2. Modifier le useEffect pour gérer les plans offerts
+useEffect(() => {
+  const fetchSubscriptionPlans = async () => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('subscription_plans')
+        .select('*')
+        .eq('is_active', true)
+        .order('price_monthly', { ascending: true });
+      
+      if (error) throw error;
+      
+      setPlans(data || []);
+    } catch (err) {
+      console.error('Erreur lors du chargement des plans:', err.message);
+      // ... reste du code existant
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchSubscriptionPlans();
+  
+  // MODIFICATION ICI : Vérifier si le plan actuel est offert
+  if (currentUser && subscriptionPlan) {
+    setCurrentPlanId(subscriptionPlan.id);
+    
+    // Vérifier si l'abonnement actuel est offert
+    const checkIfPlanIsOffered = async () => {
       try {
-        setLoading(true);
         
-        const { data, error } = await supabase
-          .from('subscription_plans')
-          .select('*')
+        const { data: userDetail, errorUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', currentUser.email)
+          .single();
+        
+        if (errorUser){        
+          console.error('Erreur lors de la vérification du plan:', errorUser);
+          setIsCurrentPlanOffered(false);
+          return null;}  
+
+        const { data: subscription, error } = await supabase
+          .from('user_subscriptions')
+          .select('payment_method, is_active, status')
+          .eq('user_id', userDetail.id)
+          .eq('plan_id', subscriptionPlan.id)
           .eq('is_active', true)
-          .order('price_monthly', { ascending: true });
-        
-        if (error) throw error;
-        
-        setPlans(data || []);
+          .single();
+
+        if (!error && subscription) {
+          // Si le plan est offert, permettre la souscription à d'autres plans
+          setIsCurrentPlanOffered(subscription.payment_method === 'offert');
+        }
       } catch (err) {
-        console.error('Erreur lors du chargement des plans:', err.message);
-        // Charger des plans par défaut si erreur
-        setPlans([
-          {
-            id: 1,
-            name: 'Gratuit',
-            description: 'Accès limité aux fonctionnalités de base',
-            price_monthly: 0,
-            price_yearly: 0,
-            max_scan_auto: 3,
-            max_scan_manuel: 5,
-            max_recherche: 5,
-            max_consult_avis: 3,
-            features: {
-              'Déposer avis avec preuve d\'achat': true,
-              'Gestion des favoris limité à 3': true,
-              'Historique des consultations': false,
-              'Accès aux informations Nutri/Eco Score': false,
-              'Publicité / Annonce': true,
-              '1 semaine Essential offert': true
-            }
-          },
-          {
-            id: 2,
-            name: 'Essential',
-            description: 'Pour utilisateurs réguliers',
-            price_monthly: 0.99,
-            price_yearly: 10,
-            max_scan_auto: 9999,
-            max_scan_manuel: 9999,
-            max_recherche: 9999,
-            max_consult_avis: 9999,
-            features: {
-              'Déposer Avis avec preuve d\'achat': true,
-              'Gestion des favoris': true,
-              'Historique des consultations': true,
-              'Accès aux informations Nutri/Eco Score': false,
-              'Publicité / Annonce': false,
-              '1 semaine Premium offert': true
-            }
-          },
-          {
-            id: 3,
-            name: 'Premium',
-            description: 'Pour utilisateurs intensifs',
-            price_monthly: 19.99,
-            price_yearly: 200,
-            max_scan_auto: 9999,
-            max_scan_manuel: 9999,
-            max_recherche: 9999,
-            max_consult_avis: 9999,
-            features: {
-              'Déposer Avis avec preuve d\'achat': true,
-              'Gestion des favoris': true,
-              'Historique des consultations': true,
-              'Accès aux informations Nutri/Eco Score': true,
-              'Publicité / Annonce': false
-            }
-          }
-        ]);
-      } finally {
-        setLoading(false);
+        console.error('Erreur lors de la vérification du plan:', err);
+        setIsCurrentPlanOffered(false);
       }
     };
 
-    fetchSubscriptionPlans();
-    
-    if (currentUser && subscriptionPlan) {
-      setCurrentPlanId(subscriptionPlan.id);
-    }
-  }, [currentUser, subscriptionPlan]);
+    checkIfPlanIsOffered();
+  }
+}, [currentUser, subscriptionPlan]);
 
-  const isCurrentPlan = (planId) => {
-    return currentPlanId === planId;
-  };
+// 3. Modifier la fonction isCurrentPlan
+const isCurrentPlan = (planId) => {
+  // Si le plan actuel est offert, on ne considère pas qu'il est déjà souscrit
+  if (isCurrentPlanOffered) {
+    return false;
+  }
+  return currentPlanId === planId;
+};
 
   const handleSubscribe = (planId, planName) => {
     if (planName === 'Gratuit') {
       return;
     }
     
-    if (isCurrentPlan(planId)) {
+  if (isCurrentPlan(planId) && !isCurrentPlanOffered) {
       console.log("Vous êtes déjà abonné à ce plan");
       return;
     }
@@ -566,9 +552,10 @@ const SubscriptionPlans = () => {
               const planColor = getPlanColor(plan);
               const isPopular = isPlanPopular(plan);
               const isCurrentUserPlan = isCurrentPlan(plan.id);
+              const isOfferedPlan = currentPlanId === plan.id && isCurrentPlanOffered;
 
               return (
-                                <div 
+                  <div 
                   key={plan.id}
                   className={`relative transition-all duration-700 transform ${
                     animationDone ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'
@@ -576,23 +563,28 @@ const SubscriptionPlans = () => {
                   style={{ transitionDelay: `${animationDone ? 0 : 300 + index * 150}ms` }}
                 >
                   {/* Badge recommandé ou plan actuel */}
-                  {(isPopular || isCurrentUserPlan) && (
+                  {(isPopular || isCurrentUserPlan|| isOfferedPlan) && (
                     <div className={`absolute -top-6 left-1/2 transform -translate-x-1/2 z-30 ${
                       isCurrentUserPlan 
                         ? 'bg-blue-500' 
                         : 'bg-gradient-to-r from-amber-400 to-amber-500'
                     } text-white px-5 py-2 rounded-full text-xs font-bold shadow-lg flex items-center whitespace-nowrap`}>
                       {isCurrentUserPlan ? (
-                        <>
-                          <Award size={14} className="mr-1" />
-                          VOTRE PLAN ACTUEL
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles size={14} className="mr-1" />
-                          RECOMMANDÉ
-                        </>
-                      )}
+             <>
+              <Award size={14} className="mr-1" />
+              VOTRE ABONNEMENT ACTUEL
+            </>
+          ) : isOfferedPlan ? (
+            <>
+              <Gift size={14} className="mr-1" />
+              ABONNEMENT OFFERT
+            </>
+          ) : (
+            <>
+              <Sparkles size={14} className="mr-1" />
+              RECOMMANDÉ
+            </>
+          )}
                     </div>
                   )}
 

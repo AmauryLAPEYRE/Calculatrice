@@ -1,54 +1,7 @@
 // src/services/receiptAnalysisService.js - Version corrigée
 import { supabase } from '../supabaseClient';
-
-/**
- * Récupère les articles d'un ticket de caisse depuis la base de données
- * @param {string} receiptId - ID du ticket de caisse
- * @returns {Promise<Object>} - Liste des articles avec informations de succès/erreur
- */
-export const getReceiptItems = async (receiptId) => {
-  try {
-    console.log("🔍 Chargement des articles pour le ticket ID:", receiptId);
-    
-    if (!receiptId) {
-      console.error("❌ Erreur: ID de ticket manquant");
-      throw new Error("L'ID du ticket est requis pour charger les articles");
-    }
-
-    // Récupérer les articles depuis Supabase
-    const { data, error } = await supabase
-      .from('receipt_items')
-      .select('*')
-      .eq('receipt_id', receiptId)
-      .order('ordre', { ascending: true });
-      
-    if (error) {
-      console.error("❌ Erreur Supabase:", error);
-      throw error;
-    }
-    
-    console.log(`✅ ${data.length} articles chargés avec succès`);
-    
-    // Ajouter un ID temporaire si besoin pour la gestion dans le composant
-    const itemsWithIds = data.map(item => ({
-      ...item,
-      id: item.id || `db-item-${Math.random().toString(36).substr(2, 9)}`
-    }));
-    
-    return {
-      success: true,
-      items: itemsWithIds
-    };
-  } catch (error) {
-    console.error("❌ Erreur lors du chargement des articles:", error);
-    return {
-      success: false,
-      error: error.message,
-      items: []
-    };
-  }
-};
-
+import { getReceiptItems} from '../services/unifiedReceiptService';
+import { deleteReceipt } from '../services/storageService';
 /**
  * Envoie une image de ticket à l'API d'analyse et traite le résultat
  * @param {string} imageUrl - URL de l'image de ticket téléchargée
@@ -151,8 +104,17 @@ if (receipt.total || receipt.date || (enseigne && enseigne.nom)) {
         totalAmount = parseFloat(cleanTotal);
         
         if (!isNaN(totalAmount)) {
-          const minAmount = totalAmount - 0.5;
-          const maxAmount = totalAmount + 0.5;
+          // si 2% de la somme total est inférieru à 1 € on prend 1e
+          let minAmount;
+          let maxAmount;
+
+          if (totalAmount * 0.02 < 1) {
+            minAmount = totalAmount - 1;
+            maxAmount = totalAmount + 1;
+          } else {
+            minAmount = totalAmount - (totalAmount * 0.02 );
+            maxAmount = totalAmount + (totalAmount * 0.02 );
+          }
           
           console.log(`💰 Recherche par montant: ${minAmount} - ${maxAmount}`);
           
@@ -245,13 +207,18 @@ if (receipt.total || receipt.date || (enseigne && enseigne.nom)) {
       
       // Supprimer le ticket actuel qui est un duplicata
       try {
-        await supabase
-          .from('receipts')
-          .delete()
-          .eq('id', receiptId);
         
-        console.log("🗑️ Ticket dupliqué supprimé avec succès");
-        
+        try {
+            const deleteResult = await deleteReceipt(receiptId, userId);
+
+            if (deleteResult.success) {
+              console.log("🗑️ Ticket dupliqué supprimé avec succès");
+            } else {
+              console.error("⚠️ Échec de la suppression du document non-ticket:", deleteResult.error);
+            }
+          } catch (deleteError) {
+            console.error("❌ Erreur lors de la suppression du document non-ticket:", deleteError);
+          }
         // Retourner un résultat spécial indiquant un duplicata
         return {
           success: true,
@@ -526,80 +493,6 @@ const createReceiptItems = async (receiptId, items) => {
   }
 };
 
-/**
- * Met à jour un article de ticket dans la base de données
- * @param {string} itemId - ID de l'article à mettre à jour
- * @param {Object} updatedData - Nouvelles données pour l'article
- * @returns {Promise<Object>} - Résultat de la mise à jour
- */
-export const updateReceiptItem = async (itemId, updatedData) => {
-  try {
-    console.log("🔄 Mise à jour de l'article ID:", itemId, "avec données:", updatedData);
-    
-    if (!itemId) {
-      console.error("❌ Erreur: ID d'article manquant");
-      throw new Error("L'ID de l'article est requis pour la mise à jour");
-    }
-
-    // Si l'ID commence par "ai-item-" ou "temp-", c'est un ID temporaire 
-    // et l'article doit être inséré plutôt que mis à jour
-    if (itemId.startsWith('ai-item-') || itemId.startsWith('temp-')) {
-      console.log("⚠️ ID temporaire détecté, insertion d'un nouvel article");
-      
-      const { data: insertedItem, error: insertError } = await supabase
-        .from('receipt_items')
-        .insert([{
-          receipt_id: updatedData.receipt_id,
-          designation: updatedData.designation,
-          product_code: updatedData.product_code || null,
-          quantite: updatedData.quantite,
-          prix_unitaire: updatedData.prix_unitaire,
-          prix_total: updatedData.prix_total,
-          ordre: updatedData.ordre || 0
-        }])
-        .select()
-        .single();
-        
-      if (insertError) throw insertError;
-      
-      return {
-        success: true,
-        item: insertedItem,
-        action: 'inserted'
-      };
-    }
-    
-    // Mise à jour de l'article existant
-    const { data: updatedItem, error } = await supabase
-      .from('receipt_items')
-      .update({
-        designation: updatedData.designation,
-        product_code: updatedData.product_code,
-        quantite: updatedData.quantite,
-        prix_unitaire: updatedData.prix_unitaire,
-        prix_total: updatedData.prix_total
-      })
-      .eq('id', itemId)
-      .select()
-      .single();
-      
-    if (error) throw error;
-    
-    console.log("✅ Article mis à jour avec succès:", updatedItem);
-    
-    return {
-      success: true,
-      item: updatedItem,
-      action: 'updated'
-    };
-  } catch (error) {
-    console.error("❌ Erreur lors de la mise à jour de l'article:", error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-};
 
 /**
  * Supprime un article de ticket dans la base de données
@@ -643,8 +536,6 @@ export const deleteReceiptItem = async (itemId) => {
 }; 
 
 export default {
-  getReceiptItems,
   analyzeAndProcessReceipt,
-  updateReceiptItem,
   deleteReceiptItem
 };

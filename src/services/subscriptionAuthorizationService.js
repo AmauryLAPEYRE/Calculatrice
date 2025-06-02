@@ -37,7 +37,8 @@ export const getSubscriptionLimits = async (planName = 'Gratuit') => {
         canAccessFavorites: data.can_favorite || false,
         canAccessHistory: data.can_history || false,
         canAccessDetailedInfo: data.can_access_detailed_info || false,
-        canAccessNutri: data.can_nutri || false
+        canAccessNutri: data.can_nutri || false,
+        canAccessEnv: data.can_env || false
       }
     };
   } catch (error) {
@@ -72,7 +73,8 @@ export const getDailyUsage = async (userId) => {
       .from('product_history')
       .select('interaction_type')
       .eq('user_id', userId)
-      .gte('interaction_date', todayISO);
+      .gte('interaction_date', todayISO)
+      .neq('product_code', ''); // au cas où il y aurait des vides;
       
     if (error) {
       console.error(`Erreur lors de la récupération de l'historique:`, error);
@@ -180,6 +182,26 @@ export const checkActionAuthorization = async (userId, actionType) => {
       case 'nutrition_info':
         isAuthorized = limits.canAccessNutri;
         reason = !isAuthorized ? 'Informations nutritionnelles détaillées disponibles avec un abonnement' : '';
+        break;
+      case 'environement_info':
+        isAuthorized = limits.canAccessEnv;
+        reason = !isAuthorized ? 'Informations Environnements détaillées disponibles avec un abonnement' : '';
+        break;
+      case 'Conseils_de_recyclage':
+        isAuthorized = limits.canAccessEnv;
+        reason = !isAuthorized ? 'Informations Environnements détaillées disponibles avec un abonnement' : '';
+        break;
+      case 'Eco-Score_detaille':
+        isAuthorized = limits.canAccessEnv;
+        reason = !isAuthorized ? 'Informations Environnements détaillées disponibles avec un abonnement' : '';
+        break;
+      case 'Empreinte_carbone_detaillee':
+        isAuthorized = limits.canAccessEnv;
+        reason = !isAuthorized ? 'Informations Environnements détaillées disponibles avec un abonnement' : '';
+        break;
+      case 'Informations sur huile de palme':
+        isAuthorized = limits.canAccessEnv;
+        reason = !isAuthorized ? 'Informations Environnements détaillées disponibles avec un abonnement' : '';
         break;
       default:
         isAuthorized = false;

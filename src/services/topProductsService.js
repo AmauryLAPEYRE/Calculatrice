@@ -160,3 +160,85 @@ export const getProductFilters = async () => {
     };
   }
 };
+
+// Ajouter cette fonction au fichier src/services/topProductsService.js
+
+/**
+ * Récupère les produits avec des statistiques calculées en temps réel pour une période donnée
+ * @param {object} options - Options de recherche et de tri
+ * @param {string} options.searchTerm - Terme de recherche pour le nom du produit
+ * @param {string} options.sortBy - Champ à utiliser pour le tri
+ * @param {boolean} options.sortAsc - Tri ascendant (true) ou descendant (false)
+ * @param {number} options.limit - Nombre maximum de produits à récupérer
+ * @param {number} options.offset - Décalage pour la pagination
+ * @param {string} options.startDate - Date de début au format ISO
+ * @param {string} options.endDate - Date de fin au format ISO
+ * @returns {Promise<object>} - Résultat de la requête
+ */
+export const getTopProductsLive = async (options = {}) => {
+  const { 
+    searchTerm = '',
+    sortBy = 'average_rating',
+    sortAsc = false,
+    limit = 20,
+    offset = 0,
+    startDate,
+    endDate
+  } = options;
+
+  try {
+    // Valider les options de tri pour éviter les injections SQL
+    const validSortFields = [
+      'average_rating', 
+      'taste_rating', 
+      'quantity_rating', 
+      'price_rating',
+      'total_reviews', 
+      'total_favorites', 
+      'average_price'
+    ];
+    
+    // Garantir que le champ de tri est valide
+    const sortField = validSortFields.includes(sortBy) ? sortBy : 'average_rating';
+    
+    // Valider les dates
+    if (!startDate || !endDate) {
+      throw new Error('Les dates de début et de fin sont requises');
+    }
+
+    // Construire la requête avec des calculs en temps réel
+    // Utilisation d'une approche RPC pour exécuter une requête SQL complexe
+    const { data, error } = await supabase.rpc('get_top_products_live', {
+      p_search_term: searchTerm.trim().toLowerCase(),
+      p_sort_by: sortField,
+      p_sort_asc: sortAsc,
+      p_limit: limit,
+      p_offset: offset,
+      p_start_date: startDate,
+      p_end_date: endDate
+    });
+
+    if (error) throw error;
+
+    // Compter le nombre total de résultats pour la pagination
+    const { data: countData, error: countError } = await supabase.rpc('count_top_products_live', {
+      p_search_term: searchTerm.trim().toLowerCase(),
+      p_start_date: startDate,
+      p_end_date: endDate
+    });
+
+    if (countError) throw countError;
+    
+    return { 
+      success: true, 
+      products: data || [],
+      totalCount: countData && countData[0] ? countData[0].count : 0
+    };
+  } catch (error) {
+    console.error("Erreur lors de la récupération des produits live:", error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
+  }
+};

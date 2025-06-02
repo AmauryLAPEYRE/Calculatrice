@@ -342,10 +342,58 @@ export const getAIReviewsForProduct = async (productCode) => {
   }
 };
 
+// 1. Fonction à ajouter dans reviewService.js pour appeler la fonction Edge
+/**
+ * Valide automatiquement un avis via l'IA
+ * @param {string} reviewId - ID de l'avis à valider
+ * @returns {Promise<object>} - Résultat de la validation
+ */
+export const validateReviewWithAI = async (reviewId) => {
+  try {
+    if (!reviewId) {
+      throw new Error("ID de l'avis requis");
+    }
+
+    // URL de votre fonction Edge - à adapter selon votre déploiement
+    const EDGE_FUNCTION_URL = `https://gwjkbtbtqntwaqtrflnq.supabase.co/functions/v1/validate-review`;
+    
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({ reviewId })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error || "Erreur lors de la validation");
+    }
+
+    return { 
+      success: true, 
+      data: result 
+    };
+  } catch (error) {
+    console.error("Erreur lors de la validation IA:", error.message);
+    return { 
+      success: false, 
+      error: error.message 
+    };
+  }
+};
+
 export default {
   generateAIReview,
   shouldGenerateAIReview,
   autoGenerateReviewIfNeeded,
   checkExistingAIReview,
-  getAIReviewsForProduct
+  getAIReviewsForProduct,
+  validateReviewWithAI
 };

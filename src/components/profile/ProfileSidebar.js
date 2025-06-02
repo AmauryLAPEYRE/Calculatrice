@@ -23,6 +23,7 @@ import {
   Gift,
   TrendingUp
 } from 'lucide-react';
+import UserAvatar from './UserAvatar';
 
 /**
  * Composant de navigation latérale pour les pages de profil (Desktop)
@@ -191,18 +192,18 @@ const ProfileSidebar = ({ currentUser, onLogout, loading }) => {
         </div>
         
         <div className="relative flex flex-col items-center text-center">
-          {/* Avatar avec badge de statut */}
-          <div className="relative mb-3">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center text-white text-2xl font-bold shadow-lg transform hover:scale-105 transition-transform">
-              {currentUser?.displayName ? 
-                currentUser.displayName.charAt(0).toUpperCase() : 
-                (currentUser?.email ? currentUser.email.charAt(0).toUpperCase() : 'U')
-              }
-            </div>
-            {/* Badge de statut */}
-            <div className={`absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-gradient-to-br ${statusInfo.color} flex items-center justify-center text-white shadow-md`}>
-              {React.cloneElement(statusInfo.icon, { size: 14 })}
-            </div>
+          {/* Avatar sans badge */}
+          <div className="mb-3">
+            <UserAvatar 
+              userId={userDetails?.firebase_uid || currentUser?.uid}
+              size={80}
+              status={userDetails?.status || 'bronze'}
+              displayName={currentUser?.displayName || currentUser?.email}
+              customAvatarUrl={userDetails?.avatarUrl}
+              avatarSeed={userDetails?.avatarSeed}
+              className="shadow-lg transform hover:scale-105 transition-transform"
+              showBorder={true}
+            />
           </div>
           
           {/* Informations utilisateur */}

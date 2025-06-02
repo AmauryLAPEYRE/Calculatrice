@@ -38,7 +38,7 @@ export const createSubscription = async (
       console.error("❌ Erreur lors de la récupération de l'utilisateur:", userError);
       throw new Error(`Erreur lors de la récupération de l'utilisateur: ${userError.message}`);
     }
-    
+
     // 1. Créer un enregistrement temporaire pour suivre l'intention d'abonnement
     const { data: intent, error: intentError } = await supabase
       .from('subscription_intents')

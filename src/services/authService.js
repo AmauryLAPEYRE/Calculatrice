@@ -12,7 +12,7 @@ import {
     onAuthStateChanged
 } from "firebase/auth";
 import { auth, db } from "../firebase";
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { syncUserWithSupabase } from "../supabaseClient"; // Import ajouté
 
 // Créer un nouvel utilisateur
 export const registerUser = async (email, password, displayName, addressInfo = {}) => {
@@ -23,9 +23,8 @@ export const registerUser = async (email, password, displayName, addressInfo = {
     // Mettre à jour le profil avec le nom d'affichage
     await updateProfile(user, { displayName });
     
-    // Synchroniser avec Supabase et inclure les informations d'adresse
-    // Note: La synchronisation Supabase est gérée par AuthContext via onAuthStateChanged
-    //await syncUserWithDatabase(user, addressInfo);
+    // Synchroniser immédiatement avec Supabase avec les informations d'adresse
+    await syncUserWithSupabase(user, addressInfo);
     
     return user;
   } catch (error) {
@@ -69,8 +68,6 @@ export const subscribeToAuthChanges = (callback) => {
 };
 
 // Fonction ROBUSTE pour la connexion Google avec fallback
-// Version finale propre pour src/services/authService.js
-
 export const signInWithGoogle = async () => {
   try {
     // Configuration du provider avec paramètres essentiels
@@ -116,11 +113,3 @@ export const signInWithGoogle = async () => {
     }
   }
 };
-
-
-
-
-
-
-
-

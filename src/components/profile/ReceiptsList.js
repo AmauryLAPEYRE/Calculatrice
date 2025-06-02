@@ -1,9 +1,9 @@
-// src/components/profile/ReceiptsList.js - Avec détails des articles
+// src/components/profile/ReceiptsList.js - Avec option Public/Privé pour les tickets
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getUserReceipts, deleteReceipt } from '../../services/storageService';
+import { getUserReceipts, deleteReceipt, toggleReceiptPublicVisibility } from '../../services/storageService';
 import ProfileLayout from './ProfileLayout';
-import { Receipt, Calendar, AlertCircle, Trash2,  Loader, Image, ShoppingBag, Search, AlertTriangle, DollarSign, Filter, ZoomIn, ClipboardList, MapPin } from 'lucide-react';
+import { Receipt, Calendar, AlertCircle, Trash2, Loader, Image, ShoppingBag, Search, AlertTriangle, DollarSign, Filter, ZoomIn, ClipboardList, MapPin, Eye, EyeOff, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatDate } from '../../utils/formatters';
 import { supabase } from '../../supabaseClient';
@@ -30,7 +30,10 @@ const ReceiptsList = () => {
   const [expandedReceipt, setExpandedReceipt] = useState({});
   const [loadingReviewCheck, setLoadingReviewCheck] = useState({});
   const [receiptReviewStatus, setReceiptReviewStatus] = useState({});
-  const [filterMode, setFilterMode] = useState('all'); // 'all', 'used', 'unused'
+  const [filterMode, setFilterMode] = useState('all'); // 'all', 'used', 'unused', 'public', 'private'
+  
+  // États pour la gestion de la visibilité publique
+  const [togglePublicVisibility, setTogglePublicVisibility] = useState({});
   
   // États pour les visionneuses
   const [zoomViewerOpen, setZoomViewerOpen] = useState(false);
@@ -40,7 +43,7 @@ const ReceiptsList = () => {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [currentDetailReceipt, setCurrentDetailReceipt] = useState(null);
   const [receiptItems, setReceiptItems] = useState([]);
-  const [loadingItems,setLoadingItems] = useState(false);
+  const [loadingItems, setLoadingItems] = useState(false);
   
   // Chargement des tickets de l'utilisateur
   useEffect(() => {
@@ -104,11 +107,42 @@ const ReceiptsList = () => {
     }
   };
   
+  // Fonction pour basculer la visibilité publique d'un ticket
+  const handleTogglePublicVisibility = async (receiptId, currentState) => {
+    if (togglePublicVisibility[receiptId]) return;
+    
+    setTogglePublicVisibility(prev => ({ ...prev, [receiptId]: true }));
+    
+    try {
+      const { success, error: visibilityError } = await toggleReceiptPublicVisibility(receiptId, !currentState);
+      
+      if (success) {
+        // Mettre à jour l'état local
+        setReceipts(prev => prev.map(receipt => 
+          receipt.id === receiptId 
+            ? { ...receipt, allow_public_display: !currentState }
+            : receipt
+        ));
+      } else {
+        console.error("Erreur lors du changement de visibilité:", visibilityError);
+        alert("Erreur lors du changement de visibilité du ticket");
+      }
+    } catch (err) {
+      console.error("Erreur lors du changement de visibilité:", err);
+      alert("Une erreur est survenue lors du changement de visibilité");
+    } finally {
+      setTogglePublicVisibility(prev => ({ ...prev, [receiptId]: false }));
+    }
+  };
+  
   // Filtrer les tickets selon le mode sélectionné
   const filteredReceipts = receipts.filter(receipt => {
     if (filterMode === 'all') return true;
-    const hasReview = receiptReviewStatus[receipt.id];
-    return filterMode === 'used' ? hasReview : !hasReview;
+    if (filterMode === 'used') return receiptReviewStatus[receipt.id];
+    if (filterMode === 'unused') return !receiptReviewStatus[receipt.id];
+    if (filterMode === 'public') return receipt.allow_public_display;
+    if (filterMode === 'private') return !receipt.allow_public_display;
+    return true;
   });
   
   // Charger plus de tickets
@@ -291,7 +325,7 @@ const ReceiptsList = () => {
                 </p>
               </div>
               
-              {/* Filtres */}
+              {/* Filtres étendus */}
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                 <div className="flex items-center space-x-2">
                   <Filter size={16} className="text-gray-400" />
@@ -327,6 +361,26 @@ const ReceiptsList = () => {
                     }`}
                   >
                     Sans avis
+                  </button>
+                  <button
+                    onClick={() => setFilterMode('public')}
+                    className={`px-3 py-1.5 text-sm ${
+                      filterMode === 'public' 
+                        ? 'bg-purple-50 text-purple-700 font-medium' 
+                        : 'bg-white text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    Publics
+                  </button>
+                  <button
+                    onClick={() => setFilterMode('private')}
+                    className={`px-3 py-1.5 text-sm ${
+                      filterMode === 'private' 
+                        ? 'bg-gray-50 text-gray-700 font-medium' 
+                        : 'bg-white text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    Privés
                   </button>
                 </div>
               </div>
@@ -364,23 +418,44 @@ const ReceiptsList = () => {
                         </div>
                       </div>
                       
-                      {/* Badge de statut */}
-                      {loadingReviewCheck[receipt.id] ? (
-                        <div className="flex items-center text-gray-500 text-xs bg-gray-50 px-2 py-1 rounded-full">
-                          <Loader size={10} className="animate-spin mr-1" />
-                          Vérification...
+                      {/* Badges de statut */}
+                      <div className="flex flex-col space-y-1">
+                        {loadingReviewCheck[receipt.id] ? (
+                          <div className="flex items-center text-gray-500 text-xs bg-gray-50 px-2 py-1 rounded-full">
+                            <Loader size={10} className="animate-spin mr-1" />
+                            Vérification...
+                          </div>
+                        ) : receiptReviewStatus[receipt.id] ? (
+                          <div className="flex items-center text-blue-800 text-xs bg-blue-50 px-2 py-1 rounded-full border border-blue-100">
+                            <AlertCircle size={10} className="mr-1" />
+                            Avis associé
+                          </div>
+                        ) : (
+                          <div className="flex items-center text-orange-700 text-xs bg-orange-50 px-2 py-1 rounded-full border border-orange-100">
+                            <AlertTriangle size={10} className="mr-1" />
+                            Sans avis
+                          </div>
+                        )}
+                        
+                        {/* Badge de visibilité publique */}
+                        <div className={`flex items-center text-xs px-2 py-1 rounded-full border ${
+                          receipt.allow_public_display 
+                            ? 'text-purple-800 bg-purple-50 border-purple-100' 
+                            : 'text-gray-600 bg-gray-50 border-gray-100'
+                        }`}>
+                          {receipt.allow_public_display ? (
+                            <>
+                              <Eye size={10} className="mr-1" />
+                              Public
+                            </>
+                          ) : (
+                            <>
+                              <EyeOff size={10} className="mr-1" />
+                              Privé
+                            </>
+                          )}
                         </div>
-                      ) : receiptReviewStatus[receipt.id] ? (
-                        <div className="flex items-center text-blue-800 text-xs bg-blue-50 px-2 py-1 rounded-full border border-blue-100">
-                          <AlertCircle size={10} className="mr-1" />
-                          Avis associé
-                        </div>
-                      ) : (
-                        <div className="flex items-center text-orange-700 text-xs bg-orange-50 px-2 py-1 rounded-full border border-orange-100">
-                          <AlertTriangle size={10} className="mr-1" />
-                          Sans avis
-                        </div>
-                      )}
+                      </div>
                     </div>
                   </div>
                   
@@ -413,7 +488,7 @@ const ReceiptsList = () => {
                           <ShoppingBag size={16} className="text-gray-400 mt-0.5 mr-2" />
                           <div>
                             <p className="text-xs text-gray-500">Magasin</p>
-                            <p className="text-sm font-medium">{receipt.enseignes.nom || "Non spécifié"}</p>
+                            <p className="text-sm font-medium">{receipt.enseignes?.nom || "Non spécifié"}</p>
                           </div>
                         </div>
                       )}
@@ -422,13 +497,13 @@ const ReceiptsList = () => {
                           <MapPin size={16} className="text-gray-400 mt-0.5 mr-2" />
                           <div>
                             <p className="text-xs text-gray-500">CP</p>
-                            <p className="text-sm font-medium">{receipt.enseignes.code_postal || "Non spécifié"}</p>
+                            <p className="text-sm font-medium">{receipt.enseignes?.code_postal || "Non spécifié"}</p>
                           </div>
                         </div>
                       )}
                     </div>
 
-                    {/* Aperçu de l'image du ticket - Mise à jour pour le zoom avancé */}
+                    {/* Aperçu de l'image du ticket */}
                     <div 
                       className={`relative cursor-pointer rounded-lg overflow-hidden transition-all duration-300 ${
                         expandedReceipt[receipt.id] ? 'shadow-lg' : 'shadow-sm border border-gray-200'
@@ -446,7 +521,7 @@ const ReceiptsList = () => {
                             />
                           </div>
                           
-                          {/* Boutons flottants sur l'image (zoom et détails) */}
+                          {/* Boutons flottants sur l'image */}
                           <div className="absolute bottom-2 right-2 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                             {/* Bouton détails des articles */}
                             <button
@@ -485,6 +560,40 @@ const ReceiptsList = () => {
                           </p>
                         </div>
                       )}
+                    </div>
+                    
+                    {/* Section Visibilité publique */}
+                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Shield size={16} className="text-gray-500" />
+                          <span className="text-sm font-medium text-gray-700">Visibilité</span>
+                        </div>
+                        <button
+                          onClick={() => handleTogglePublicVisibility(receipt.id, receipt.allow_public_display)}
+                          disabled={togglePublicVisibility[receipt.id]}
+                          className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                            receipt.allow_public_display 
+                              ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' 
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          {togglePublicVisibility[receipt.id] ? (
+                            <Loader size={12} className="animate-spin mr-1" />
+                          ) : receipt.allow_public_display ? (
+                            <Eye size={12} className="mr-1" />
+                          ) : (
+                            <EyeOff size={12} className="mr-1" />
+                          )}
+                          {receipt.allow_public_display ? "Public" : "Privé"}
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {receipt.allow_public_display 
+                          ? "Ce ticket est visible par tous les utilisateurs" 
+                          : "Ce ticket n'est visible que par vous"
+                        }
+                      </p>
                     </div>
                     
                     {/* Actions - Section des boutons */}

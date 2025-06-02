@@ -2,48 +2,6 @@
 import { supabase } from '../supabaseClient';
 
 /**
- * Récupère les articles d'un ticket de caisse depuis la base de données
- * @param {string} receiptId - ID du ticket de caisse
- * @returns {Promise<Object>} - Liste des articles avec informations de succès/erreur
- */
-export const getReceiptItems = async (receiptId) => {
-  try { 
-    console.log("🔍 Chargement des articles pour le ticket ID:", receiptId);
-    
-    if (!receiptId) {
-      console.error("❌ Erreur: ID de ticket manquant");
-      throw new Error("L'ID du ticket est requis pour charger les articles");
-    }
-
-    // Récupérer les articles depuis Supabase
-    const { data, error } = await supabase
-      .from('receipt_items')
-      .select('*')
-      .eq('receipt_id', receiptId)
-      .order('ordre', { ascending: true });
-      
-    if (error) {
-      console.error("❌ Erreur Supabase:", error);
-      throw error;
-    }
-    
-    console.log(`✅ ${data.length} articles chargés avec succès`);
-    
-    return {
-      success: true,
-      items: data
-    };
-  } catch (error) {
-    console.error("❌ Erreur lors du chargement des articles:", error);
-    return {
-      success: false,
-      error: error.message,
-      items: []
-    };
-  }
-};
-
-/**
  * Récupère tous les tickets d'un utilisateur
  * @param {string} userId - ID de l'utilisateur
  * @returns {Promise<object>} - Résultat avec la liste des tickets

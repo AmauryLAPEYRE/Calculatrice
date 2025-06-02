@@ -254,6 +254,7 @@ export const canPerformAction = async (userId, actionType) => {
       `)
       .eq('user_id', userId)
       .eq('is_active', true)
+      .order('subscription_plans.priority', { ascending: false })
       .order('end_date', { ascending: false })
       .limit(1)
       .single();
@@ -366,15 +367,26 @@ export const getUserSubscription = async (firebaseUid) => {
       if (userError) throw userError;
       
       // 2. Récupérer l'abonnement actif avec la priorité la plus haute
-      const { data: subscriptions, error: subscriptionsError } = await supabase
-        .from('user_subscriptions')
-        .select(`
-          *,
-          subscription_plans(*)
-        `)
-        .eq('user_id', userData.id)
-        .eq('is_active', true);
-        
+const { data: subscriptions, error: subscriptionsError } = await supabase
+  .from('user_subscriptions')
+  .select(`
+    *,
+    subscription_plans(*)
+  `)
+  .eq('user_id', userData.id)
+  .eq('is_active', true)
+  .order('end_date', { ascending: false });
+
+// 2. Trier côté client par priority
+if (subscriptions) {
+  subscriptions.sort((a, b) => {
+    // Tri par priority (desc) puis par end_date (desc)
+    const priorityDiff = (b.subscription_plans?.priority || 0) - (a.subscription_plans?.priority || 0);
+    if (priorityDiff !== 0) return priorityDiff;
+    
+    return new Date(b.end_date) - new Date(a.end_date);
+  });
+}
       if (subscriptionsError) throw subscriptionsError;
       
       // Si aucun abonnement actif n'est trouvé, renvoyer le plan gratuit

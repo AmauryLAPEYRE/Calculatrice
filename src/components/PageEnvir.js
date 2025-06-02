@@ -79,16 +79,17 @@ const PageEnvir = ({ product }) => {
       )}
       
       {/* SECTION RESTREINTE: Conseils de recyclage */}
+ {/* SECTION RESTREINTE: Conseils de recyclage */}
       {product.packaging_text && product.packaging_text.includes("recycl") && (
         <div className="mb-6 relative">
-          <div style={!hasEnvirAccess ? restrictedSectionStyle : {}} className="relative">
+          <div className="relative">
             <h3 className="text-lg font-semibold mb-3">Recyclage</h3>
             <div className="p-4 bg-blue-50 rounded-lg">
               <p className="text-gray-700">{product.packaging_text}</p>
             </div>
           </div>
           
-          {!hasEnvirAccess && <RestrictedOverlay title="Conseils de recyclage" />}
+          
         </div>
       )}
       
@@ -185,7 +186,7 @@ const PageEnvir = ({ product }) => {
             )}
           </div>
           
-          {!hasEnvirAccess && <RestrictedOverlay title="Éco-Score détaillé" />}
+          {!hasEnvirAccess && <RestrictedOverlay title="Éco-Score_detaille" />}
         </div>
       ) : (
         !hasEnvirAccess ? null : (
@@ -256,7 +257,7 @@ const PageEnvir = ({ product }) => {
             </div>
           </div>
           
-          {!hasEnvirAccess && <RestrictedOverlay title="Empreinte carbone détaillée" />}
+          {!hasEnvirAccess && <RestrictedOverlay title="Empreinte_carbone_detaillee" />}
         </div>
       )}
       
@@ -298,7 +299,7 @@ const PageEnvir = ({ product }) => {
             </div>
           </div>
           
-          {!hasEnvirAccess && <RestrictedOverlay title="Informations sur l'huile de palme" />}
+          {!hasEnvirAccess && <RestrictedOverlay title="Informations_sur_huile_de_palme" />}
         </div>
       )}
     </div>

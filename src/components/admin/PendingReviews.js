@@ -1,4 +1,4 @@
-// src/components/admin/PendingReviews.js - Version responsive améliorée
+// src/components/admin/PendingReviews.js - Version avec gestion des raisons de rejet
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
@@ -16,7 +16,9 @@ import {
   Calendar,
   ShoppingBag,
   Filter,
-  ExternalLink
+  ExternalLink,
+  AlertTriangle,
+  Send
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../supabaseClient';
@@ -40,6 +42,12 @@ const PendingReviews = () => {
   const [receiptModalData, setReceiptModalData] = useState(null);
   const [totalCount, setTotalCount] = useState(0);
   const [showFilters, setShowFilters] = useState(false); // État pour contrôler l'affichage des filtres sur mobile
+  
+  // NOUVEAU : États pour la gestion du rejet avec raison
+  const [rejectModalData, setRejectModalData] = useState(null); // {reviewId, reviewInfo}
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [submittingRejection, setSubmittingRejection] = useState(false);
+  const [expandedRejectionReasons, setExpandedRejectionReasons] = useState({}); // Pour afficher/masquer les raisons de rejet
   
   // Vérifier si l'utilisateur est administrateur
   useEffect(() => {
@@ -71,7 +79,7 @@ const PendingReviews = () => {
         if (activeTab === 'pending') {
           query = query.eq('status', 'pending');
         } else if (activeTab === 'rejected') {
-          query = query.eq('status', 'rejected');
+          query = query.in('status', ['rejected','rejected_ia']);
         } else if (activeTab === 'approved') {
           query = query.in('status', ['approved', 'approved_auto']);
         }
@@ -160,32 +168,70 @@ const PendingReviews = () => {
     }
   };
   
-  // Fonction pour rejeter un avis
-  const handleRejectReview = async (reviewId) => {
-    setProcessingIds(prev => ({ ...prev, [reviewId]: 'rejecting' }));
+  // NOUVEAU : Fonction pour ouvrir la modal de rejet
+  const handleOpenRejectModal = (review) => {
+    setRejectModalData({
+      reviewId: review.id,
+      productName: review.products?.product_name || 'Produit sans nom',
+      userName: review.users.display_name,
+      comment: review.comment
+    });
+    setRejectionReason('');
+  };
+  
+  // NOUVEAU : Fonction pour fermer la modal de rejet
+  const handleCloseRejectModal = () => {
+    setRejectModalData(null);
+    setRejectionReason('');
+    setSubmittingRejection(false);
+  };
+  
+  // NOUVEAU : Fonction pour rejeter un avis avec raison
+  const handleSubmitRejection = async () => {
+    if (!rejectionReason.trim()) {
+      setError("Une raison de rejet est obligatoire");
+      return;
+    }
+    
+    if (rejectionReason.trim().length < 10) {
+      setError("La raison de rejet doit contenir au moins 10 caractères");
+      return;
+    }
+    
+    setSubmittingRejection(true);
     
     try {
       const { error } = await supabase
         .from('product_reviews')
         .update({ 
           status: 'rejected',
+          rejection_reason: rejectionReason.trim(),
           modification_date: new Date().toISOString()
         })
-        .eq('id', reviewId);
+        .eq('id', rejectModalData.reviewId);
         
       if (error) throw error;
       
       // Mettre à jour l'état des avis
-      setAllReviews(prev => prev.filter(review => review.id !== reviewId));
-      setReviews(prev => prev.filter(review => review.id !== reviewId));
+      setAllReviews(prev => prev.filter(review => review.id !== rejectModalData.reviewId));
+      setReviews(prev => prev.filter(review => review.id !== rejectModalData.reviewId));
       setTotalCount(prev => prev - 1);
+      
+      // Fermer la modal
+      handleCloseRejectModal();
+      setError(null);
       
     } catch (err) {
       console.error("Erreur lors du rejet de l'avis:", err);
       setError("Erreur lors du rejet de l'avis. Veuillez réessayer.");
     } finally {
-      setProcessingIds(prev => ({ ...prev, [reviewId]: null }));
+      setSubmittingRejection(false);
     }
+  };
+  
+  // Fonction pour rejeter un avis (ancienne version, maintenant redirige vers la modal)
+  const handleRejectReview = async (review) => {
+    handleOpenRejectModal(review);
   };
   
   // Fonction pour annuler un avis (remettre en attente)
@@ -197,6 +243,7 @@ const PendingReviews = () => {
         .from('product_reviews')
         .update({ 
           status: 'pending',
+          rejection_reason: null, // NOUVEAU : Effacer la raison de rejet en remettant en attente
           modification_date: new Date().toISOString()
         })
         .eq('id', reviewId);
@@ -291,6 +338,7 @@ const PendingReviews = () => {
     switch(activeTab) {
       case 'pending': return 'Avis en attente';
       case 'rejected': return 'Avis rejetés';
+      case 'rejected_ia': return 'Avis rejetés en auto par l\'Ia';
       case 'approved': return 'Avis approuvés';
       case 'approved_auto': return 'Avis approuvés auto';
       default: return 'Gestion des avis';
@@ -300,6 +348,14 @@ const PendingReviews = () => {
   // Fonction pour basculer l'affichage des filtres sur mobile
   const toggleFilters = () => {
     setShowFilters(!showFilters);
+  };
+
+  // NOUVEAU : Fonction pour basculer l'affichage de la raison de rejet
+  const toggleRejectionReason = (reviewId) => {
+    setExpandedRejectionReasons(prev => ({
+      ...prev,
+      [reviewId]: !prev[reviewId]
+    }));
   };
   
   return (
@@ -316,7 +372,10 @@ const PendingReviews = () => {
           <h3 className="text-lg font-medium text-red-800">Une erreur est survenue</h3>
           <p className="mt-2 text-red-700">{error}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              setError(null);
+              window.location.reload();
+            }}
             className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
           >
             Réessayer
@@ -510,15 +569,11 @@ const PendingReviews = () => {
                               
                               {/* Bouton pour rejeter */}
                               <button
-                                onClick={() => handleRejectReview(review.id)}
+                                onClick={() => handleRejectReview(review)}
                                 className="px-2 md:px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 flex items-center text-xs md:text-sm"
                                 disabled={processingIds[review.id]}
                               >
-                                {processingIds[review.id] === 'rejecting' ? (
-                                  <Loader size={12} className="animate-spin mr-1" />
-                                ) : (
-                                  <X size={12} className="mr-1" />
-                                )}
+                                <X size={12} className="mr-1" />
                                 Rejeter
                               </button>
                             </>
@@ -560,15 +615,11 @@ const PendingReviews = () => {
                             <>
                               {/* Bouton pour rejeter un avis approuvé */}
                               <button
-                                onClick={() => handleRejectReview(review.id)}
+                                onClick={() => handleRejectReview(review)}
                                 className="px-2 md:px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 flex items-center text-xs md:text-sm"
                                 disabled={processingIds[review.id]}
                               >
-                                {processingIds[review.id] === 'rejecting' ? (
-                                  <Loader size={12} className="animate-spin mr-1" />
-                                ) : (
-                                  <X size={12} className="mr-1" />
-                                )}
+                                <X size={12} className="mr-1" />
                                 Rejeter
                               </button>
                               
@@ -602,6 +653,41 @@ const PendingReviews = () => {
                           </button>
                         </div>
                       </div>
+                      
+                      {/* NOUVEAU : Affichage de la raison de rejet pour les avis rejetés */}
+                      {review.rejection_reason && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle size={16} className="text-red-600 mt-0.5 flex-shrink-0" />
+                              <div className="flex-1">
+                                <h4 className="text-sm font-semibold text-red-800 mb-1">Avis rejeté</h4>
+                                <button
+                                  onClick={() => toggleRejectionReason(review.id)}
+                                  className="text-sm text-red-700 hover:text-red-800 font-medium flex items-center gap-1"
+                                >
+                                  {expandedRejectionReasons[review.id] ? 'Masquer' : 'Voir'} la raison
+                                  <ChevronDown 
+                                    size={14} 
+                                    className={`transform transition-transform duration-200 ${
+                                      expandedRejectionReasons[review.id] ? 'rotate-180' : ''
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Raison de rejet (développable) */}
+                          {expandedRejectionReasons[review.id] && (
+                            <div className="mt-2 pt-2 border-t border-red-200">
+                              <p className="text-sm text-red-700 leading-relaxed">
+                                {review.rejection_reason}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       
                       {/* Contenu de l'avis (visible par défaut) - Responsive */}
                       <div>
@@ -687,6 +773,95 @@ const PendingReviews = () => {
                   </div>
                 );
               })}
+            </div>
+          )}
+          
+          {/* NOUVEAU : Modal pour saisir la raison de rejet */}
+          {rejectModalData && (
+            <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center p-4">
+              <div className="bg-white rounded-xl max-w-2xl w-full p-6 mx-auto">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-bold text-gray-800 flex items-center">
+                    <AlertTriangle className="text-red-500 mr-2" size={24} />
+                    Rejeter l'avis
+                  </h3>
+                  <button
+                    onClick={handleCloseRejectModal}
+                    className="text-gray-500 hover:text-gray-700 text-2xl"
+                    disabled={submittingRejection}
+                  >
+                    ×
+                  </button>
+                </div>
+                
+                {/* Aperçu de l'avis à rejeter */}
+                <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                  <h4 className="font-semibold text-gray-800 mb-2">Avis à rejeter :</h4>
+                  <div className="text-sm text-gray-600 mb-2">
+                    <strong>Utilisateur :</strong> {rejectModalData.userName}
+                  </div>
+                  <div className="text-sm text-gray-600 mb-2">
+                    <strong>Produit :</strong> {rejectModalData.productName}
+                  </div>
+                  <div className="text-sm text-gray-700 bg-white p-3 rounded border">
+                    <strong>Commentaire :</strong> "{rejectModalData.comment}"
+                  </div>
+                </div>
+                
+                {/* Champ pour la raison de rejet */}
+                <div className="mb-6">
+                  <label htmlFor="rejectionReason" className="block text-sm font-semibold text-gray-700 mb-2">
+                    Raison du rejet <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    id="rejectionReason"
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
+                    rows="4"
+                    placeholder="Expliquez pourquoi cet avis est rejeté (minimum 10 caractères)..."
+                    disabled={submittingRejection}
+                  />
+                  <div className="mt-1 text-xs text-gray-500">
+                    {rejectionReason.length}/10 caractères minimum
+                  </div>
+                </div>
+                
+                {/* Messages d'erreur */}
+                {error && error.includes("rejet") && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-700">{error}</p>
+                  </div>
+                )}
+                
+                {/* Boutons d'action */}
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={handleCloseRejectModal}
+                    className="px-6 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    disabled={submittingRejection}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={handleSubmitRejection}
+                    className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center"
+                    disabled={submittingRejection || !rejectionReason.trim() || rejectionReason.trim().length < 10}
+                  >
+                    {submittingRejection ? (
+                      <>
+                        <Loader size={16} className="animate-spin mr-2" />
+                        Rejet en cours...
+                      </>
+                    ) : (
+                      <>
+                        <Send size={16} className="mr-2" />
+                        Confirmer le rejet
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
           

@@ -2,11 +2,13 @@
 import { supabase } from '../supabaseClient';
 // src/services/reviewService.js - Ajoutez cet import en haut du fichier
 import { linkReceiptItemToReview } from './receiptService';
+import { validateReviewWithAI } from '../services/aiReviewService';
 
 /**
  * Récupère tous les critères d'évaluation disponibles
  * @returns {Promise<object>} - Résultat avec les critères d'évaluation
  */
+// Fonctions inchangées...
 export const getReviewCriterias = async () => {
   try {
     const { data, error } = await supabase
@@ -30,32 +32,16 @@ export const getReviewCriterias = async () => {
  * @param {number} offset - Décalage pour la pagination
  * @returns {Promise<object>} - Résultat avec les avis
  */
+/**
+ * Récupère les avis pour un produit spécifique avec le nouveau champ allow_public_display
+ */
 export const getProductReviews = async (productCode, limit = 10, offset = 0) => {
   try {
     if (!productCode) {
       throw new Error("Code produit requis");
     }
     
-    // Récupérer d'abord les métadonnées du produit pour avoir la note moyenne, les détails et le prix moyen
-    const { data: productData, error: productError } = await supabase
-      .from('products')
-      .select(`
-        average_rating,
-        taste_rating,
-        quantity_rating,
-        price_rating,
-        total_reviews,
-        total_favorites,
-        average_price
-      `)
-      .eq('code', productCode)
-      .single();
-      
-    if (productError && productError.code !== 'PGRST116') {
-      throw productError;
-    }
-    
-  // Récupérer les avis avec les notes par critère ET les informations des enseignes
+    // Récupérer les avis avec les informations du ticket de caisse
     const { data: reviews, count, error } = await supabase
       .from('product_reviews')
       .select(`
@@ -64,6 +50,7 @@ export const getProductReviews = async (productCode, limit = 10, offset = 0) => 
         review_ratings (id, criteria_id, rating),
         receipts!product_reviews_receipt_id_fkey (
           id,
+          allow_public_display,
           enseigne_id,
           enseignes!receipts_enseigne_id_fkey (
             code_postal
@@ -122,7 +109,7 @@ export const getProductReviews = async (productCode, limit = 10, offset = 0) => 
       if (review.receipts && review.receipts.enseignes) {
         codePostal = review.receipts.enseignes.code_postal;
       }
-      // Inclure les nouveaux champs dans le résultat formaté
+      
       return {
         id: review.id,
         user_name: review.users.display_name,
@@ -136,27 +123,18 @@ export const getProductReviews = async (productCode, limit = 10, offset = 0) => 
         purchase_price: review.purchase_price,
         purchase_date: review.purchase_date,
         store_name: review.store_name,
-        code_postal: codePostal, // NOUVEAU : Ajout du code postal
+        code_postal: codePostal,
         has_location: !!review.purchase_location,
-        // Ne pas envoyer le ticket si l'utilisateur n'a pas autorisé le partage
-        can_show_receipt: review.authorize_receipt_sharing && review.receipt_id,
-        review_source: review.review_source 
-
+        // NOUVEAU : Utiliser allow_public_display de la table receipts
+        can_show_receipt: review.receipts?.allow_public_display && review.receipt_id,
+        review_source: review.review_source
       };
     });
     
     return { 
       success: true, 
       reviews: formattedReviews, 
-      total: count,
-      average: productData?.average_rating || 0,
-      taste_rating: productData?.taste_rating || 0,
-      quantity_rating: productData?.quantity_rating || 0,
-      price_rating: productData?.price_rating || 0,
-      average_price: productData?.average_price || 0,
-      total_reviews: productData?.total_reviews || 0,
-      total_favorites: productData?.total_favorites || 0,
-      verified_reviews: reviews.filter(r => r.is_verified).length || 0
+      total: count
     };
   } catch (error) {
     console.error("Erreur lors de la récupération des avis:", error.message);
@@ -176,6 +154,9 @@ export const getProductReviews = async (productCode, limit = 10, offset = 0) => 
  */  
 
 
+/**
+ * Ajoute un nouvel avis pour un produit (version mise à jour)
+ */
 export const addProductReview = async (
   userId, 
   productCode, 
@@ -198,59 +179,22 @@ export const addProductReview = async (
       throw new Error("Au moins une note est requise");
     }
     
-    // Vérifier si un article du ticket est sélectionné si le ticket a des articles
-    if (purchaseInfo.receiptItems && purchaseInfo.receiptItems.length > 0 && !purchaseInfo.selectedItemId) {
-      throw new Error("Vous devez sélectionner un article du ticket correspondant au produit");
-    }
-    
-    // Vérifier si l'utilisateur a déjà laissé un avis pour ce produit
-    const { data: existingReview, error: checkError } = await supabase
-      .from('product_reviews')
-      .select('id')
-      .eq('user_id', userId)
-      .neq('status','rejected')
-      .eq('product_code', productCode)
-      .single();
-      
-    if (existingReview) {
-      throw new Error("Vous avez déjà laissé un avis pour ce produit");
-    }
-      
-    // Vérifier si le ticket existe et appartient à l'utilisateur
-    if (receiptId) {
-      const { data: receipt, error: receiptError } = await supabase
-        .from('receipts')
-        .select('id')
-        .eq('id', receiptId)
-        .eq('user_id', userId)
-        .single();
-        
-      if (receiptError) {
-        throw new Error("Ticket de caisse invalide");
-      }
-    }
-    
     // Extraire les informations d'achat
     const { 
       price,
       date,
       location,
       storeName,
-      authorizeSharing = false,
-      selectedItemId = null, // Récupération de l'ID de l'article sélectionné
+      allowPublicDisplay = false, // NOUVEAU : Utiliser allowPublicDisplay
+      selectedItemId = null,
       receiptItems = [],
-      matchScore = 0 // Nouveau: score de correspondance pour la logique de statut
+      matchScore = 0
     } = purchaseInfo;
     
     // Déterminer le statut de l'avis en fonction du taux de correspondance
-    const reviewStatus = matchScore >= 0.70 ? 'approved_auto' : 'pending';
-    
-    // Récupérer les ratings spécifiques par critère
-    const tasteRating = ratings['1'] || 0; 
-    const quantityRating = ratings['2'] || 0;
-    const priceRating = ratings['3'] || 0;
-    
-    // Calculer la note moyenne avec 2 décimales
+    const reviewStatus = matchScore >= 1.70 ? 'approved_auto' : 'pending';
+    // j'ai mis 1.7 car cela ne peut jamais arrivé et cela force toujours l'ia a vontroler les avis et surtout les commentaire.
+    // Calculer la note moyenne
     const criteriaWeights = {
       '1': 3.0, // Poids du goût
       '2': 2.0, // Poids de la quantité
@@ -268,7 +212,7 @@ export const addProductReview = async (
     
     const averageRating = totalWeight > 0 ? Number((weightedSum / totalWeight).toFixed(2)) : 0;
     
-    // Insérer l'avis avec les nouveaux champs
+    // Insérer l'avis SANS authorize_receipt_sharing
     const { data: newReview, error: reviewError } = await supabase
       .from('product_reviews')
       .insert([
@@ -282,10 +226,9 @@ export const addProductReview = async (
           status: reviewStatus,
           match_score: matchScore,
           average_rating: averageRating,
-          taste_rating: tasteRating,
-          quantity_rating: quantityRating,
-          price_rating: priceRating,
-          authorize_receipt_sharing: authorizeSharing,
+          taste_rating: ratings['1'] || 0,
+          quantity_rating: ratings['2'] || 0,
+          price_rating: ratings['3'] || 0,
           purchase_price: price,
           purchase_date: date,
           purchase_location: location ? `(${location.lat},${location.lng})` : null,
@@ -296,6 +239,38 @@ export const addProductReview = async (
       .single();
       
     if (reviewError) throw reviewError;
+    // ICI APPEL DE LA FONCTION EDGE IA si le product_reviews.status='pending'
+    // NOUVEAU : Appel de la fonction Edge IA si le statut est 'pending'
+    if (newReview.status === 'pending') {
+      console.log(`Validation automatique démarrée pour l'avis ${newReview.id}`);
+      
+      // Appel asynchrone pour ne pas bloquer la réponse utilisateur
+      validateReviewWithAI(newReview.id)
+        .then(result => {
+          if (result.success) {
+            console.log(`Avis ${newReview.id} validé automatiquement:`, result.data.decision);
+          } else {
+            console.error(`Erreur validation automatique avis ${newReview.id}:`, result.error);
+          }
+        })
+        .catch(error => {
+          console.error(`Erreur critique validation avis ${newReview.id}:`, error);
+        });
+    }
+    // Mettre à jour le ticket de caisse avec allow_public_display
+    if (receiptId) {
+      const { error: receiptUpdateError } = await supabase
+        .from('receipts')
+        .update({ 
+          allow_public_display: allowPublicDisplay,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', receiptId);
+        
+      if (receiptUpdateError) {
+        console.warn("Avertissement: La mise à jour du partage du ticket a échoué:", receiptUpdateError);
+      }
+    }
     
     // Insérer les notes pour chaque critère
     const ratingsToInsert = Object.entries(ratings).map(([criteriaId, rating]) => ({
@@ -310,12 +285,9 @@ export const addProductReview = async (
       
     if (ratingsError) throw ratingsError;
 
-    // Si un article est sélectionné, mettre à jour uniquement cet article avec le code produit
+    // Traitement des articles du ticket (inchangé)
     if (selectedItemId && receiptId) {
       try {
-        console.log(`Liaison de l'article ${selectedItemId} à l'avis ${newReview.id}`);
-        
-        // Mettre à jour uniquement l'article sélectionné
         const { error: updateError } = await supabase
           .from('receipt_items')
           .update({ 
@@ -332,47 +304,6 @@ export const addProductReview = async (
       }
     }
     
-    // Mettre à jour les articles du ticket SANS modifier leur code produit
-    if (receiptId && receiptItems && receiptItems.length > 0) {
-      console.log("Articles du ticket à traiter:", receiptItems);
-      
-      for (const item of receiptItems) {
-        // Ne pas traiter l'article déjà sélectionné (éviter doublons)
-        if (item.id === selectedItemId) continue;
-        
-        if (item.id && (item.id.startsWith('ai-item-') || item.id.startsWith('temp-'))) {
-          // C'est un ID temporaire, insérer mais SANS le code produit
-          const newItem = {
-            receipt_id: receiptId,
-            designation: item.designation,
-            // Ne pas définir product_code ici
-            quantite: item.quantite,
-            prix_unitaire: item.prix_unitaire,
-            prix_total: item.prix_total,
-            is_selected: false
-          };
-          
-          await supabase.from('receipt_items').insert([newItem]);
-        } else if (item.id) {
-          // Ne mettre à jour que la désignation et prix, PAS le code produit
-          const updateItem = {
-            designation: item.designation,
-            // Ne pas définir product_code ici
-            quantite: item.quantite,
-            prix_unitaire: item.prix_unitaire,
-            prix_total: item.prix_total
-          };
-          
-          await supabase.from('receipt_items').update(updateItem).eq('id', item.id);
-        }
-      }
-    }
-    
-    // Mettre à jour les statistiques du produit seulement si l'avis est approuvé
-    if (reviewStatus === 'approved' || reviewStatus === 'approved_auto') {
-      await updateProductStats(productCode);
-    }
-    
     return { 
       success: true, 
       review: newReview,
@@ -384,6 +315,7 @@ export const addProductReview = async (
   }
 };
 
+
 /**
  * Met à jour les statistiques agrégées d'un produit (notes moyennes, nombre d'avis, etc.)
  * @param {string} productCode - Code-barres du produit
@@ -391,7 +323,6 @@ export const addProductReview = async (
  */
 export const updateProductStats = async (productCode) => {
   try {
-    // Calculer toutes les statistiques du produit
     const { data: reviews, error } = await supabase
       .from('product_reviews')
       .select(`
@@ -409,27 +340,20 @@ export const updateProductStats = async (productCode) => {
     if (error) throw error;
     
     if (!reviews || reviews.length === 0) {
-      return true; // Pas d'avis approuvés
+      return true;
     }
     
-    // Nombre total d'avis
     const totalReviews = reviews.length;
-    
-    // Note moyenne globale
     const averageRating = Number((reviews.reduce((sum, r) => sum + (r.average_rating || 0), 0) / totalReviews).toFixed(2));
-    
-    // Notes moyennes par critère
     const tasteRating = Number((reviews.reduce((sum, r) => sum + (r.taste_rating || 0), 0) / totalReviews).toFixed(2));
     const quantityRating = Number((reviews.reduce((sum, r) => sum + (r.quantity_rating || 0), 0) / totalReviews).toFixed(2));
     const priceRating = Number((reviews.reduce((sum, r) => sum + (r.price_rating || 0), 0) / totalReviews).toFixed(2));
     
-    // Prix moyen (uniquement basé sur les avis vérifiés avec un prix d'achat)
     const validPriceReviews = reviews.filter(r => r.is_verified && r.purchase_price > 0);
     const averagePrice = validPriceReviews.length > 0 
       ? Number((validPriceReviews.reduce((sum, r) => sum + r.purchase_price, 0) / validPriceReviews.length).toFixed(2))
       : 0;
     
-    // Mettre à jour le produit avec les statistiques calculées
     const { error: updateError } = await supabase
       .from('products')
       .update({
@@ -596,18 +520,25 @@ export const checkUserLike = async (userId, reviewId) => {
  * @param {number} offset - Décalage pour la pagination
  * @returns {Promise<object>} - Résultat avec les avis
  */
+/**
+ * Récupère tous les avis d'un utilisateur (version mise à jour)
+ */
 export const getUserReviews = async (userId, limit = 10, offset = 0) => {
   try {
     if (!userId) {
       throw new Error("ID utilisateur requis");
     }
     
-    // Récupérer les avis de l'utilisateur avec relations
+    // Récupérer les avis de l'utilisateur avec les informations du ticket
     const { data: reviews, count, error } = await supabase
       .from('product_reviews')
       .select(`
         *,
-        review_ratings (id, criteria_id, rating)
+        review_ratings (id, criteria_id, rating),
+        receipts (
+          id,
+          allow_public_display
+        )
       `, { count: 'exact' })
       .eq('user_id', userId)
       .order('creation_date', { ascending: false })
@@ -622,7 +553,7 @@ export const getUserReviews = async (userId, limit = 10, offset = 0) => {
       
     if (criteriasError) throw criteriasError;
     
-    // Pour chaque avis, récupérer les informations du produit associé
+    // Formater les avis
     const formattedReviews = await Promise.all(reviews.map(async (review) => {
       // Organiser les notes par critère
       const ratingsByCriteria = {};
@@ -638,7 +569,7 @@ export const getUserReviews = async (userId, limit = 10, offset = 0) => {
         }
       });
       
-      // Récupérer les infos de base du produit (nom, marque, etc.)
+      // Récupérer les infos de base du produit
       const { data: product, error: productError } = await supabase
         .from('products')
         .select('product_name, brands, image_url, firebase_image_path')
@@ -649,23 +580,6 @@ export const getUserReviews = async (userId, limit = 10, offset = 0) => {
         console.warn(`Erreur lors de la récupération du produit ${review.product_code}:`, productError);
       }
       
-      // S'il n'y a pas d'image dans le produit, chercher dans product_images
-      let productImageUrl = product?.image_url || product?.firebase_image_path || null;
-      
-      if (!productImageUrl) {
-        // Chercher la première image (généralement l'image principale)
-        const { data: productImages, error: imagesError } = await supabase
-          .from('product_images')
-          .select('image_url, firebase_path')
-          .eq('product_code', review.product_code)
-          .order('display_order', { ascending: true })
-          .limit(1);
-          
-        if (!imagesError && productImages && productImages.length > 0) {
-          productImageUrl = productImages[0].image_url || productImages[0].firebase_path;
-        }
-      }
-      
       return {
         id: review.id,
         product_code: review.product_code,
@@ -673,22 +587,19 @@ export const getUserReviews = async (userId, limit = 10, offset = 0) => {
         date: review.creation_date,
         is_verified: review.is_verified,
         average_rating: review.average_rating,
-          review_source: review.review_source, // AJOUT
-          // Informations du produit
+        review_source: review.review_source,
         product_name: product?.product_name || 'Produit sans nom',
         product_brand: product?.brands || 'Marque inconnue',
-        product_image_url: productImageUrl,
-        // Statut de l'avis
+        product_image_url: product?.image_url || product?.firebase_image_path,
         status: review.status,
-        // Notes par critère
+        rejection_reason: review.rejection_reason, // NOUVEAU : Inclure la raison du rejet
         ratings: ratingsByCriteria,
-        // Informations d'achat
         purchase_price: review.purchase_price,
         purchase_date: review.purchase_date,
         store_name: review.store_name,
         has_location: !!review.purchase_location,
-        authorize_receipt_sharing: review.authorize_receipt_sharing,
-        // Score de correspondance
+        // NOUVEAU : Utiliser allow_public_display du ticket
+        allow_public_display: review.receipts?.allow_public_display || false,
         match_score: review.match_score
       };
     }));
@@ -700,10 +611,14 @@ export const getUserReviews = async (userId, limit = 10, offset = 0) => {
   }
 };
 
+
 /**
  * Obtient l'image du ticket de caisse si autorisé
  * @param {string} reviewId - ID de l'avis
  * @returns {Promise<object>} - URL du ticket ou erreur
+ */
+/**
+ * Obtient l'image du ticket de caisse si autorisé (version mise à jour)
  */
 export const getReceiptImage = async (reviewId) => {
   try {
@@ -711,10 +626,18 @@ export const getReceiptImage = async (reviewId) => {
       throw new Error("ID de l'avis requis");
     }
     
-    // Vérifier si l'avis autorise le partage du ticket
+    // Vérifier si l'avis autorise le partage du ticket via la table receipts
     const { data: review, error: reviewError } = await supabase
       .from('product_reviews')
-      .select('receipt_id, authorize_receipt_sharing, user_id','review_source')
+      .select(`
+        receipt_id,
+        user_id,
+        review_source,
+        receipts (
+          firebase_url,
+          allow_public_display
+        )
+      `)
       .eq('id', reviewId)
       .single();
       
@@ -724,22 +647,13 @@ export const getReceiptImage = async (reviewId) => {
       throw new Error("Aucun ticket associé à cet avis");
     }
     
-    if (!review.authorize_receipt_sharing) {
+    if (!review.receipts?.allow_public_display) {
       throw new Error("L'utilisateur n'a pas autorisé le partage du ticket");
     }
     
-    // Récupérer les informations du ticket
-    const { data: receipt, error: receiptError } = await supabase
-      .from('receipts')
-      .select('firebase_url')
-      .eq('id', review.receipt_id)
-      .single();
-      
-    if (receiptError) throw receiptError;
-    
     return { 
       success: true, 
-      receiptUrl: receipt.firebase_url 
+      receiptUrl: review.receipts.firebase_url 
     };
   } catch (error) {
     console.error("Erreur lors de la récupération du ticket:", error.message);
@@ -766,6 +680,7 @@ export const canUserLeaveReview = async (userId, productCode) => {
       .eq('user_id', userId)
       .eq('product_code', productCode)
       .neq('status','rejected')
+      .neq('status','rejected_ia')
       .order('creation_date', { ascending: false })
       .limit(1);
       
@@ -812,22 +727,38 @@ export const canUserLeaveReview = async (userId, productCode) => {
  * @param {boolean} authorize - Autoriser le partage (true) ou non (false)
  * @returns {Promise<object>} - Résultat de l'opération
  */
+/**
+ * Active ou désactive le partage public du ticket de caisse (version mise à jour)
+ */
 export const toggleReceiptSharing = async (reviewId, authorize) => {
   try {
     if (!reviewId) {
       throw new Error("ID de l'avis requis");
     }
     
-    // Mettre à jour l'autorisation
-    const { error } = await supabase
+    // Récupérer l'ID du ticket depuis l'avis
+    const { data: reviewData, error: reviewError } = await supabase
       .from('product_reviews')
+      .select('receipt_id')
+      .eq('id', reviewId)
+      .single();
+
+    if (reviewError) throw reviewError;
+    
+    if (!reviewData.receipt_id) {
+      throw new Error("Aucun ticket associé à cet avis");
+    }
+
+    // Mettre à jour allow_public_display dans la table receipts
+    const { error: receiptError } = await supabase
+      .from('receipts')
       .update({ 
-        authorize_receipt_sharing: authorize,
-        modification_date: new Date().toISOString()
+        allow_public_display: authorize,
+        updated_at: new Date().toISOString()
       })
-      .eq('id', reviewId);
-      
-    if (error) throw error;
+      .eq('id', reviewData.receipt_id);
+
+    if (receiptError) throw receiptError;
     
     return { success: true };
   } catch (error) {
@@ -835,6 +766,7 @@ export const toggleReceiptSharing = async (reviewId, authorize) => {
     return { success: false, error: error.message };
   }
 };
+
 
 /**
  * Récupère les derniers prix enregistrés pour un produit
@@ -862,12 +794,13 @@ export const getProductRecentPrices = async (productCode, limit = 10) => {
         average_rating,
         users(display_name),
         receipt_id,
-        receipts!product_reviews_receipt_id_fkey(enseigne_id),
-        review_source'
+        receipts!product_reviews_receipt_id_fkey(enseigne_id, country_code),
+        review_source
       `)
       .eq('product_code', productCode)
       .in('status', ['approved', 'approved_auto'])
       .not('purchase_price', 'is', null)
+      .eq('review_source','user')
       .order('purchase_date', { ascending: false })
       .limit(limit);
       
@@ -902,6 +835,7 @@ export const getProductRecentPrices = async (productCode, limit = 10) => {
       purchase_date: item.purchase_date,
       store_name: item.store_name,
       code_postal: item.receipts?.enseigne_id ? enseigneMap[item.receipts.enseigne_id] : null,
+      country_code: item.receipts?.country_code ?? 'FR',
       is_verified: item.is_verified,
       average_rating: item.average_rating,
       user_display_name: item.users?.display_name || 'Anonyme'

@@ -169,7 +169,7 @@ const SearchResultItem = ({ result, onSelect, searchFilters = {} }) => {
                 ))}
               </div>
               <span className="text-sm font-medium text-amber-700">
-                {averageRating.toFixed(1)}
+                {averageRating.toFixed(2)}
               </span>
             </div>
             

@@ -1,7 +1,7 @@
 // src/components/paiement/StripePaymentForm.js
 import React, { useState, useEffect } from 'react';
 import { useStripe } from '@stripe/react-stripe-js';
-import { AlertCircle, Lock, CreditCard, Smartphone } from 'lucide-react';
+import { AlertCircle, Lock, CreditCard, Smartphone, Wallet } from 'lucide-react';
 
 const StripePaymentForm = ({ onSubmit, processing, error, plan, billingCycle, isAnnualCommitment }) => {
   const stripe = useStripe();
@@ -9,20 +9,40 @@ const StripePaymentForm = ({ onSubmit, processing, error, plan, billingCycle, is
   const [paymentMethodsAvailable, setPaymentMethodsAvailable] = useState({
     card: true,
     applePay: false,
-    googlePay: false
+    googlePay: false,
+    paypal: true // PayPal est généralement toujours disponible
   });
 
   // Vérifier quelles méthodes de paiement sont disponibles dans le navigateur
   useEffect(() => {
     if (!stripe) return;
 
-    // Vérifier Apple Pay
-    const canUseApplePay = window.ApplePaySession && window.ApplePaySession.canMakePayments();
-    setPaymentMethodsAvailable(prev => ({...prev, applePay: canUseApplePay}));
+    // DEBUG: Afficher les informations de l'environnement
+    console.log('🔍 Diagnostic des méthodes de paiement:');
+    console.log('- Protocol:', window.location.protocol);
+    console.log('- ApplePaySession exists:', !!window.ApplePaySession);
+    console.log('- ApplePaySession.canMakePayments:', window.ApplePaySession?.canMakePayments?.());
+    console.log('- PaymentRequest exists:', !!window.PaymentRequest);
+    console.log('- User Agent:', navigator.userAgent.substring(0, 100) + '...');
 
-    // Vérifier Google Pay (simplifié, car la détection complète nécessite plus de configuration)
+    // Vérifier Apple Pay - nécessite HTTPS et appareil Apple
+    const canUseApplePay = window.ApplePaySession && 
+                          window.ApplePaySession.canMakePayments() &&
+                          window.location.protocol === 'https:';
+    
+    // Vérifier Google Pay - REVENIR À LA MÉTHODE MOINS STRICTE
+    // Stripe Checkout gère lui-même la vérification HTTPS
     const canUseGooglePay = !!window.PaymentRequest;
-    setPaymentMethodsAvailable(prev => ({...prev, googlePay: canUseGooglePay}));
+    
+    console.log('✅ Résultats de détection:');
+    console.log('- Apple Pay disponible:', canUseApplePay);
+    console.log('- Google Pay disponible:', canUseGooglePay);
+    
+    setPaymentMethodsAvailable(prev => ({
+      ...prev, 
+      applePay: canUseApplePay,
+      googlePay: canUseGooglePay
+    }));
     
   }, [stripe]);
 
@@ -31,22 +51,29 @@ const StripePaymentForm = ({ onSubmit, processing, error, plan, billingCycle, is
     event.preventDefault();
 
     if (!stripe) {
-      // Stripe.js n'est pas encore chargé
       return;
     }
 
     // Déterminer les méthodes de paiement à autoriser dans Stripe Checkout
     let paymentMethodTypes = ['card']; // Toujours inclure 'card'
     
-    if (selectedPaymentMethod === 'applePay') {
-      paymentMethodTypes = ['apple_pay', 'card']; // Apple Pay + carte comme fallback
+    // Stripe Checkout peut gérer automatiquement toutes les méthodes de paiement
+    // Si on veut laisser Stripe décider automatiquement :
+    if (selectedPaymentMethod === 'auto') {
+      paymentMethodTypes = ['card', 'apple_pay', 'google_pay', 'paypal'];
+    } 
+    // Ou si on veut forcer une méthode spécifique :
+    else if (selectedPaymentMethod === 'applePay') {
+      paymentMethodTypes = ['apple_pay', 'card']; // Card comme fallback
     } 
     else if (selectedPaymentMethod === 'googlePay') {
-      paymentMethodTypes = ['google_pay', 'card']; // Google Pay + carte comme fallback
+      paymentMethodTypes = ['google_pay', 'card']; // Card comme fallback
+    }
+    else if (selectedPaymentMethod === 'paypal') {
+      paymentMethodTypes = ['paypal', 'card']; // Card comme fallback
     }
     
-    // Appeler la méthode onSubmit avec null comme paymentMethodId (pas besoin avec Checkout)
-    // et les types de paiement acceptés
+    // Appeler la méthode onSubmit avec les types de paiement acceptés
     onSubmit(null, paymentMethodTypes);
   };
 
@@ -70,7 +97,33 @@ const StripePaymentForm = ({ onSubmit, processing, error, plan, billingCycle, is
         <label className="block text-gray-700 font-medium mb-2">
           Méthode de paiement
         </label>
-        <div className="grid grid-cols-3 gap-2">
+        
+        {/* Option automatique recommandée */}
+        <div className="mb-4 p-3 bg-blue-50 rounded-md border border-blue-200">
+          <button
+            type="button"
+            onClick={() => setSelectedPaymentMethod('auto')}
+            className={`w-full flex items-center justify-between p-3 border rounded-md ${
+              selectedPaymentMethod === 'auto' ? 'border-blue-500 bg-blue-100' : 'border-gray-300 bg-white'
+            }`}
+          >
+            <div className="flex items-center">
+              <Wallet className={`mr-3 ${selectedPaymentMethod === 'auto' ? 'text-blue-600' : 'text-gray-600'}`} />
+              <div className="text-left">
+                <span className={`font-medium ${selectedPaymentMethod === 'auto' ? 'text-blue-700' : 'text-gray-700'}`}>
+                  Toutes les méthodes disponibles
+                </span>
+                <p className="text-xs text-gray-500">Recommandé - Stripe affichera automatiquement toutes vos options</p>
+              </div>
+            </div>
+            {selectedPaymentMethod === 'auto' && (
+              <div className="text-blue-600 text-sm font-medium">✓</div>
+            )}
+          </button>
+        </div>
+
+        {/* Options spécifiques */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           <button
             type="button"
             onClick={() => setSelectedPaymentMethod('card')}
@@ -79,7 +132,7 @@ const StripePaymentForm = ({ onSubmit, processing, error, plan, billingCycle, is
             }`}
           >
             <CreditCard className={`mb-2 ${selectedPaymentMethod === 'card' ? 'text-green-600' : 'text-gray-600'}`} />
-            <span className={selectedPaymentMethod === 'card' ? 'text-green-700' : 'text-gray-700'}>
+            <span className={`text-sm ${selectedPaymentMethod === 'card' ? 'text-green-700' : 'text-gray-700'}`}>
               Carte bancaire
             </span>
           </button>
@@ -93,17 +146,13 @@ const StripePaymentForm = ({ onSubmit, processing, error, plan, billingCycle, is
             }`}
             disabled={!paymentMethodsAvailable.applePay}
           >
-            <svg className="h-6 w-6 mb-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M17.72 13.063L17.9 12.5H15.5L15.7 13.063C15.889 13.542 16.334 13.855 16.816 13.855C17.297 13.855 17.731 13.542 17.92 13.063H17.72Z" 
-                fill={selectedPaymentMethod === 'applePay' ? '#16A34A' : '#4B5563'} />
-              <path d="M12.62 5.045C13.725 5.045 14.562 5.882 14.562 6.987C14.562 7.045 14.562 7.091 14.55 7.149C14.435 7.149 14.32 7.16 14.193 7.16C13.15 7.16 12.297 6.371 12.08 5.328C12.266 5.103 12.52 5.045 12.62 5.045Z" 
-                fill={selectedPaymentMethod === 'applePay' ? '#16A34A' : '#4B5563'} />
-              <path fillRule="evenodd" clipRule="evenodd" d="M7.5 5.5C5.29 5.5 3.5 7.29 3.5 9.5V14.5C3.5 16.71 5.29 18.5 7.5 18.5H16.5C18.71 18.5 20.5 16.71 20.5 14.5V9.5C20.5 7.29 18.71 5.5 16.5 5.5H7.5ZM8.816 10.855C8.334 10.855 7.889 11.168 7.7 11.647L7.5 12.21L7.3 11.647C7.111 11.168 6.666 10.855 6.184 10.855C5.703 10.855 5.269 11.168 5.08 11.647C4.88 12.126 4.994 12.681 5.364 13.051L7.2 14.887C7.361 15.037 7.639 15.037 7.8 14.887L9.636 13.051C10.006 12.681 10.12 12.126 9.92 11.647C9.731 11.168 9.297 10.855 8.816 10.855ZM12.816 10.855C12.334 10.855 11.889 11.168 11.7 11.647L11.5 12.21L11.3 11.647C11.111 11.168 10.666 10.855 10.184 10.855C9.703 10.855 9.269 11.168 9.08 11.647C8.88 12.126 8.994 12.681 9.364 13.051L11.2 14.887C11.361 15.037 11.639 15.037 11.8 14.887L13.636 13.051C14.006 12.681 14.12 12.126 13.92 11.647C13.731 11.168 13.297 10.855 12.816 10.855ZM15.7 11.647L15.5 12.21L15.3 11.647C15.111 11.168 14.666 10.855 14.184 10.855C13.703 10.855 13.269 11.168 13.08 11.647C12.88 12.126 12.994 12.681 13.364 13.051L15.2 14.887C15.361 15.037 15.639 15.037 15.8 14.887L17.636 13.051C18.006 12.681 18.12 12.126 17.92 11.647C17.731 11.168 17.297 10.855 16.816 10.855C16.334 10.855 15.889 11.168 15.7 11.647ZM14.4 9.3C14.4 8.04 13.36 7 12.1 7C11.24 7 10.5 7.44 10.1 8.1C9.7 7.44 8.96 7 8.1 7C6.84 7 5.8 8.04 5.8 9.3C5.8 9.76 5.92 10.2 6.16 10.56C6.88 11.72 9.2 14.08 10.1 15C11 14.08 13.32 11.72 14.04 10.56C14.28 10.2 14.4 9.76 14.4 9.3Z" 
-                fill={selectedPaymentMethod === 'applePay' ? '#16A34A' : '#4B5563'} />
-            </svg>
-            <span className={selectedPaymentMethod === 'applePay' ? 'text-green-700' : 'text-gray-700'}>
+            <div className="mb-2 text-2xl">🍎</div>
+            <span className={`text-sm ${selectedPaymentMethod === 'applePay' ? 'text-green-700' : 'text-gray-700'}`}>
               Apple Pay
             </span>
+            {!paymentMethodsAvailable.applePay && (
+              <span className="text-xs text-red-500">Non disponible</span>
+            )}
           </button>
           
           <button
@@ -115,16 +164,25 @@ const StripePaymentForm = ({ onSubmit, processing, error, plan, billingCycle, is
             }`}
             disabled={!paymentMethodsAvailable.googlePay}
           >
-            <svg className="h-6 w-6 mb-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12.545 12.023L12 12.932L11.455 12.023H5.73C5.33 13.607 5.33 15.286 5.73 16.87H12.545H18.27C18.67 15.286 18.67 13.607 18.27 12.023H12.545Z"
-                fill={selectedPaymentMethod === 'googlePay' ? '#16A34A' : '#4B5563'} />
-              <path d="M11.455 11.131L12 10.222L12.545 11.131H18.27C17.87 9.547 16.87 8.155 15.546 7.245C14.223 6.335 12.631 5.953 11.063 6.159C9.495 6.365 8.037 7.148 6.935 8.382C5.833 9.615 5.156 11.222 5.026 12.915L5 13.023H11.455V11.131Z"
-                fill={selectedPaymentMethod === 'googlePay' ? '#16A34A' : '#4B5563'} />
-              <path d="M12.545 16.977H5.73C6.13 18.56 7.13 19.953 8.453 20.863C9.777 21.773 11.369 22.155 12.937 21.949C14.505 21.743 15.963 20.96 17.064 19.726C18.166 18.493 18.843 16.886 18.973 15.193L19 15.085H12.545V16.977Z"
-                fill={selectedPaymentMethod === 'googlePay' ? '#16A34A' : '#4B5563'} />
-            </svg>
-            <span className={selectedPaymentMethod === 'googlePay' ? 'text-green-700' : 'text-gray-700'}>
+            <div className="mb-2 text-2xl">🌐</div>
+            <span className={`text-sm ${selectedPaymentMethod === 'googlePay' ? 'text-green-700' : 'text-gray-700'}`}>
               Google Pay
+            </span>
+            {!paymentMethodsAvailable.googlePay && (
+              <span className="text-xs text-red-500">Non disponible</span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedPaymentMethod('paypal')}
+            className={`flex flex-col items-center justify-center p-4 border rounded-md ${
+              selectedPaymentMethod === 'paypal' ? 'border-green-500 bg-green-50' : 'border-gray-300'
+            }`}
+          >
+            <div className="mb-2 text-2xl">💳</div>
+            <span className={`text-sm ${selectedPaymentMethod === 'paypal' ? 'text-green-700' : 'text-gray-700'}`}>
+              PayPal
             </span>
           </button>
         </div>
@@ -133,10 +191,14 @@ const StripePaymentForm = ({ onSubmit, processing, error, plan, billingCycle, is
       {/* Message pour informer l'utilisateur du processus */}
       <div className="mb-6 p-4 bg-blue-50 rounded-md">
         <p className="text-blue-700">
-          {selectedPaymentMethod === 'applePay' 
+          {selectedPaymentMethod === 'auto' 
+            ? "Vous serez redirigé vers une page sécurisée où toutes vos options de paiement disponibles seront affichées."
+            : selectedPaymentMethod === 'applePay' 
             ? "Vous serez redirigé vers une page sécurisée pour finaliser votre paiement avec Apple Pay."
             : selectedPaymentMethod === 'googlePay'
             ? "Vous serez redirigé vers une page sécurisée pour finaliser votre paiement avec Google Pay."
+            : selectedPaymentMethod === 'paypal'
+            ? "Vous serez redirigé vers PayPal pour finaliser votre paiement."
             : "Vous serez redirigé vers une page sécurisée pour saisir vos informations de carte."}
         </p>
       </div>
@@ -181,10 +243,12 @@ const StripePaymentForm = ({ onSubmit, processing, error, plan, billingCycle, is
             Traitement en cours...
           </div>
         ) : (
-          `Continuer le paiement avec ${
-            selectedPaymentMethod === 'applePay' ? 'Apple Pay' :
-            selectedPaymentMethod === 'googlePay' ? 'Google Pay' :
-            'Carte bancaire'
+          `Continuer le paiement${
+            selectedPaymentMethod === 'auto' ? '' :
+            selectedPaymentMethod === 'applePay' ? ' avec Apple Pay' :
+            selectedPaymentMethod === 'googlePay' ? ' avec Google Pay' :
+            selectedPaymentMethod === 'paypal' ? ' avec PayPal' :
+            ' avec Carte bancaire'
           }`
         )}
       </button>

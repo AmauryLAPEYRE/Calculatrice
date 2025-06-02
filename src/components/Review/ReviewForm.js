@@ -26,6 +26,7 @@ const ReviewForm = ({ product, onSuccess, onCancel }) => {
     authorizeReceiptSharing,
     purchaseDate,
     purchasePrice,
+    purchasePriceReceipt,
     storeName,
     postalCode,
     aiDataAvailable,
@@ -38,9 +39,15 @@ const ReviewForm = ({ product, onSuccess, onCancel }) => {
     showLowMatchAlert,
     showZeroRatingAlert,
     averageRating,
+    receiptId, // Ajout de l'ID du ticket
     
     // Setters
     setAuthorizeReceiptSharing,
+    setPurchaseDate,
+    setPurchasePrice,
+    setPurchasePriceReceipt,
+    setStoreName,
+    setPostalCode,
     
     // Gestionnaires
     handleRatingChange,
@@ -54,6 +61,19 @@ const ReviewForm = ({ product, onSuccess, onCancel }) => {
   } = useReviewForm(product, onSuccess);
 
   if (!product) return null;
+
+  // Gestionnaire pour la mise à jour des informations d'achat
+  const handlePurchaseInfoUpdate = (updatedData) => {
+    // Mettre à jour les états locaux avec les nouvelles données
+    if (updatedData.purchaseDate) setPurchaseDate(updatedData.purchaseDate);
+    if (updatedData.purchasePrice) setPurchasePrice(updatedData.purchasePrice);
+    if (updatedData.purchasePriceReceipt) setPurchasePriceReceipt(updatedData.receipt.total_ttc);
+    if (updatedData.storeName) setStoreName(updatedData.storeName);
+    if (updatedData.postalCode) setPostalCode(updatedData.postalCode);
+    
+    // Afficher un message de succès ou déclencher d'autres actions si nécessaire
+    console.log('Informations d\'achat mises à jour:', updatedData);
+  };
 
   return (
     <div className="mb-8 p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
@@ -103,18 +123,21 @@ const ReviewForm = ({ product, onSuccess, onCancel }) => {
             onAuthorizeReceiptSharingChange={setAuthorizeReceiptSharing}
           />
           
-          {/* Section informations d'achat extraites */}
+          {/* Section informations d'achat extraites - VERSION EDITABLE */}
           <PurchaseInfoSection
             aiDataAvailable={aiDataAvailable}
             purchaseDate={purchaseDate}
-            purchasePrice={purchasePrice}
+            purchasePrice={purchasePriceReceipt}
             storeName={storeName}
             postalCode={postalCode}
+            receiptId={receiptId}
+            onUpdate={handlePurchaseInfoUpdate}
           />
           
           {/* Champs cachés pour les informations d'achat */}
           <input type="hidden" name="purchaseDate" value={purchaseDate} />
           <input type="hidden" name="purchasePrice" value={purchasePrice} />
+          <input type="hidden" name="purchasePriceReceipt" value={purchasePriceReceipt} />
           <input type="hidden" name="storeName" value={storeName} />
           <input type="hidden" name="postalCode" value={postalCode} />
           
@@ -170,7 +193,7 @@ const CommentSection = ({ comment, validationErrors, onChange }) => {
           validationErrors.comment ? 'border-red-500' : 'border-gray-300'
         } rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors`}
         rows="4"
-        placeholder="Partagez votre expérience avec ce produit..."
+        placeholder="Partagez votre expérience avec ce produit... (20 caractères minimum)"
         value={comment}
         onChange={onChange}
         required

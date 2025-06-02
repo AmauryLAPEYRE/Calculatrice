@@ -31,12 +31,16 @@ import {
   Trophy,
   Package,
   BarChart3,
-  Target
+  Target,
+  X,
+  AlertTriangle,
+  ChevronDown,
+  RefreshCw
 } from 'lucide-react';
 
 /**
  * Composant pour afficher tous les avis publiés par l'utilisateur connecté
- * Design moderne inspiré de la page profil Fydo
+ * Design moderne inspiré de la page profil Fydo avec pagination
  */
 const UserReviews = () => {
   const { currentUser, userDetails } = useAuth();
@@ -44,6 +48,7 @@ const UserReviews = () => {
   // États
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false); // NOUVEAU : État pour le chargement de plus d'avis
   const [error, setError] = useState(null);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -55,6 +60,10 @@ const UserReviews = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('recent');
+  const [expandedRejection, setExpandedRejection] = useState({}); // État pour afficher/masquer les raisons de rejet
+  
+  // NOUVEAU : Constante pour la pagination
+  const REVIEWS_PER_PAGE = 20;
   
   // Statistiques calculées
   const [stats, setStats] = useState({
@@ -63,59 +72,120 @@ const UserReviews = () => {
     moyenneNotes: 0,
     avisApprouves: 0,
     avisEnAttente: 0,
+    avisRejetes: 0,
     produitsEvalues: 0
   });
   
-  // Chargement des avis de l'utilisateur
-  useEffect(() => {
+  // NOUVEAU : Fonction pour charger les avis avec pagination
+  const fetchUserReviews = async (resetData = false) => {
     if (!currentUser || !userDetails) return;
     
-    const fetchUserReviews = async () => {
-      setLoading(true);
+    const currentOffset = resetData ? 0 : offset;
+    const loadingState = resetData ? setLoading : setLoadingMore;
+    
+    loadingState(true);
+    
+    try {
+      const { success, reviews: newReviews, total, error } = await getUserReviews(
+        userDetails.id, 
+        REVIEWS_PER_PAGE, 
+        currentOffset
+      );
       
-      try {
-        const { success, reviews, total, error } = await getUserReviews(userDetails.id, 50, 0);
-        
-        if (success) {
-          setReviews(reviews);
-          setTotalReviews(total);
-          setHasMore(false); // Pour simplifier, on charge tout d'un coup
-          
-          // Calculer les statistiques
-          calculateStats(reviews);
+      if (success) {
+        if (resetData) {
+          // Remplacer toutes les données
+          setReviews(newReviews);
+          setOffset(REVIEWS_PER_PAGE);
+          calculateStats(newReviews);
         } else {
-          setError(error || "Impossible de récupérer vos avis");
+          // Ajouter aux données existantes
+          setReviews(prevReviews => [...prevReviews, ...newReviews]);
+          setOffset(prev => prev + REVIEWS_PER_PAGE);
         }
-      } catch (err) {
-        console.error("Erreur lors de la récupération des avis:", err);
-        setError("Une erreur est survenue lors du chargement de vos avis");
-      } finally {
-        setLoading(false);
+        
+        setTotalReviews(total);
+        setHasMore(newReviews.length === REVIEWS_PER_PAGE && (currentOffset + REVIEWS_PER_PAGE) < total);
+        
+        // Si c'est le premier chargement, calculer les stats
+        if (resetData) {
+          calculateStats(newReviews);
+        }
+      } else {
+        setError(error || "Impossible de récupérer vos avis");
       }
-    };
-    
-    fetchUserReviews();
-  }, [currentUser, userDetails]);
-  
-  // Calculer les statistiques
-  const calculateStats = (reviewsList) => {
-    const verified = reviewsList.filter(r => r.is_verified).length;
-    const approved = reviewsList.filter(r => r.status === 'approved' || r.status === 'approved_auto').length;
-    const pending = reviewsList.filter(r => r.status === 'pending').length;
-    const avgRating = reviewsList.reduce((sum, r) => sum + r.average_rating, 0) / (reviewsList.length || 1);
-    const uniqueProducts = new Set(reviewsList.map(r => r.product_code)).size;
-    
-    setStats({
-      totalAvis: reviewsList.length,
-      avisVerifies: verified,
-      moyenneNotes: avgRating.toFixed(1),
-      avisApprouves: approved,
-      avisEnAttente: pending,
-      produitsEvalues: uniqueProducts
-    });
+    } catch (err) {
+      console.error("Erreur lors de la récupération des avis:", err);
+      setError("Une erreur est survenue lors du chargement de vos avis");
+    } finally {
+      loadingState(false);
+    }
   };
   
-  // Filtrer et trier les avis
+  // Chargement initial des avis
+  useEffect(() => {
+    fetchUserReviews(true);
+  }, [currentUser, userDetails]);
+  
+  // NOUVEAU : Fonction pour charger plus d'avis
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      fetchUserReviews(false);
+    }
+  };
+  
+  // Calculer les statistiques (maintenant basé sur le total depuis l'API)
+  const calculateStats = async (reviewsList) => {
+    try {
+      // Pour les stats complètes, on fait une requête séparée pour obtenir tous les avis
+      const { success, reviews: allReviews } = await getUserReviews(userDetails.id, 1000, 0);
+      
+      if (success && allReviews) {
+        const verified = allReviews.filter(r => r.is_verified).length;
+        const approved = allReviews.filter(r => r.status === 'approved' || r.status === 'approved_auto').length;
+        const pending = allReviews.filter(r => r.status === 'pending').length;
+        const rejected = allReviews.filter(r => r.status === 'rejected' || r.status === 'rejected_ia').length;
+        const avgRating = allReviews.length > 0 
+          ? allReviews.reduce((sum, r) => sum + r.average_rating, 0) / allReviews.length 
+          : 0;
+        const uniqueProducts = new Set(allReviews.map(r => r.product_code)).size;
+        
+        setStats({
+          totalAvis: allReviews.length,
+          avisVerifies: verified,
+          moyenneNotes: avgRating.toFixed(1),
+          avisApprouves: approved,
+          avisEnAttente: pending,
+          avisRejetes: rejected,
+          produitsEvalues: uniqueProducts
+        });
+      } else {
+        // Fallback sur les données partielles si l'API ne permet pas de récupérer tout
+        const verified = reviewsList.filter(r => r.is_verified).length;
+        const approved = reviewsList.filter(r => r.status === 'approved' || r.status === 'approved_auto').length;
+        const pending = reviewsList.filter(r => r.status === 'pending').length;
+        const rejected = reviewsList.filter(r => r.status === 'rejected' || r.status === 'rejected_ia').length;
+        const avgRating = reviewsList.length > 0 
+          ? reviewsList.reduce((sum, r) => sum + r.average_rating, 0) / reviewsList.length 
+          : 0;
+        const uniqueProducts = new Set(reviewsList.map(r => r.product_code)).size;
+        
+        setStats({
+          totalAvis: totalReviews, // Utiliser le total de l'API
+          avisVerifies: verified,
+          moyenneNotes: avgRating.toFixed(1),
+          avisApprouves: approved,
+          avisEnAttente: pending,
+          avisRejetes: rejected,
+          produitsEvalues: uniqueProducts
+        });
+      }
+    } catch (err) {
+      console.error("Erreur lors du calcul des statistiques:", err);
+    }
+  };
+  
+  // MODIFIÉ : Filtrer et trier les avis (maintenant ne recharge plus les données)
   const getFilteredReviews = () => {
     let filtered = [...reviews];
     
@@ -125,6 +195,7 @@ const UserReviews = () => {
         if (filterStatus === 'verified') return review.is_verified;
         if (filterStatus === 'approved') return review.status === 'approved' || review.status === 'approved_auto';
         if (filterStatus === 'pending') return review.status === 'pending';
+        if (filterStatus === 'rejected') return review.status === 'rejected'|| review.status === 'rejected_ia';
         return true;
       });
     }
@@ -146,6 +217,14 @@ const UserReviews = () => {
     });
     
     return filtered;
+  };
+  
+  // NOUVEAU : Fonction pour rafraîchir les données
+  const handleRefresh = () => {
+    setOffset(0);
+    setReviews([]);
+    setError(null);
+    fetchUserReviews(true);
   };
   
   // Fonction pour charger l'image du ticket de caisse
@@ -181,7 +260,7 @@ const UserReviews = () => {
       if (success) {
         setReviews(prev => prev.map(review => 
           review.id === reviewId 
-            ? { ...review, authorize_receipt_sharing: !currentState } 
+            ? { ...review, allow_public_display: !currentState }
             : review
         ));
         
@@ -261,9 +340,15 @@ const UserReviews = () => {
         };
       case 'rejected':
         return {
-          icon: <AlertCircle size={14} />,
+          icon: <X size={14} />,
           color: 'bg-red-100 text-red-700 border-red-200',
           text: 'Rejeté'
+        };
+      case 'rejected_ia':
+        return {
+          icon: <X size={14} />,
+          color: 'bg-red-100 text-red-700 border-red-200',
+          text: 'Rejeté auto par IA'
         };
       default:
         return {
@@ -284,6 +369,14 @@ const UserReviews = () => {
     if (!expandedReceipt[reviewId] && !receiptImages[reviewId]) {
       loadReceiptImage(reviewId);
     }
+  };
+
+  // Fonction pour basculer l'affichage de la raison de rejet
+  const toggleRejectionReason = (reviewId) => {
+    setExpandedRejection(prev => ({
+      ...prev,
+      [reviewId]: !prev[reviewId]
+    }));
   };
   
   const filteredReviews = getFilteredReviews();
@@ -307,7 +400,7 @@ const UserReviews = () => {
           <h3 className="text-lg font-bold text-red-800 mb-2">Une erreur est survenue</h3>
           <p className="text-red-700 mb-4">{error}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={handleRefresh}
             className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all duration-200 transform hover:scale-105"
           >
             Réessayer
@@ -398,6 +491,20 @@ const UserReviews = () => {
               <div className="text-sm text-emerald-600">Approuvés</div>
             </div>
             
+            {/* Carte pour les avis rejetés */}
+            {stats.avisRejetes > 0 && (
+              <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-4 hover:shadow-lg transition-all duration-300 transform hover:scale-105 cursor-pointer">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="w-10 h-10 bg-red-200 rounded-xl flex items-center justify-center">
+                    <X className="text-red-700" size={20} />
+                  </div>
+                  <ChevronRight size={16} className="text-red-600" />
+                </div>
+                <div className="text-2xl font-bold text-red-800">{stats.avisRejetes}</div>
+                <div className="text-sm text-red-600">Rejetés</div>
+              </div>
+            )}
+            
             <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-4 hover:shadow-lg transition-all duration-300 transform hover:scale-105 cursor-pointer">
               <div className="flex items-center justify-between mb-2">
                 <div className="w-10 h-10 bg-orange-200 rounded-xl flex items-center justify-center">
@@ -422,13 +529,22 @@ const UserReviews = () => {
                   Votre contribution aide des milliers de consommateurs à faire les bons choix.
                 </p>
               </div>
-              <Link
-                to="/recherche-filtre"
-                className="bg-white text-green-700 px-6 py-3 rounded-xl font-semibold hover:bg-green-50 transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center"
-              >
-                <Scan size={20} className="mr-2" />
-                Scanner un nouveau produit
-              </Link>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleRefresh}
+                  className="bg-green-800 text-white px-4 py-2 rounded-xl font-semibold hover:bg-green-900 transition-all duration-200 flex items-center"
+                >
+                  <RefreshCw size={16} className="mr-2" />
+                  Actualiser
+                </button>
+                <Link
+                  to="/recherche-filtre"
+                  className="bg-white text-green-700 px-6 py-3 rounded-xl font-semibold hover:bg-green-50 transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center"
+                >
+                  <Scan size={20} className="mr-2" />
+                  Scanner un nouveau produit
+                </Link>
+              </div>
             </div>
           </div>
           
@@ -460,6 +576,7 @@ const UserReviews = () => {
                   <option value="verified">Vérifiés uniquement</option>
                   <option value="approved">Approuvés</option>
                   <option value="pending">En attente</option>
+                  <option value="rejected">Rejetés</option>
                 </select>
                 
                 <select
@@ -474,25 +591,27 @@ const UserReviews = () => {
               </div>
             </div>
             
-            {/* Résultats de recherche */}
-            {(searchTerm || filterStatus !== 'all') && (
-              <div className="mt-4 flex items-center justify-between">
-                <p className="text-sm text-gray-600">
-                  {filteredReviews.length} résultat{filteredReviews.length > 1 ? 's' : ''} trouvé{filteredReviews.length > 1 ? 's' : ''}
-                </p>
-                {(searchTerm || filterStatus !== 'all') && (
-                  <button
-                    onClick={() => {
-                      setSearchTerm('');
-                      setFilterStatus('all');
-                    }}
-                    className="text-sm text-green-600 hover:text-green-700 font-medium"
-                  >
-                    Réinitialiser les filtres
-                  </button>
+            {/* Résultats de recherche et pagination info */}
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-sm text-gray-600">
+                {(searchTerm || filterStatus !== 'all') ? (
+                  `${filteredReviews.length} résultat${filteredReviews.length > 1 ? 's' : ''} trouvé${filteredReviews.length > 1 ? 's' : ''}`
+                ) : (
+                  `${reviews.length} avis chargés sur ${totalReviews} au total`
                 )}
-              </div>
-            )}
+              </p>
+              {(searchTerm || filterStatus !== 'all') && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setFilterStatus('all');
+                  }}
+                  className="text-sm text-green-600 hover:text-green-700 font-medium"
+                >
+                  Réinitialiser les filtres
+                </button>
+              )}
+            </div>
           </div>
           
           {/* Liste des avis avec nouveau design */}
@@ -509,24 +628,35 @@ const UserReviews = () => {
                     <div className="flex items-start gap-4">
                       {/* Image du produit */}
                       <div className="w-20 h-20 bg-gradient-to-br from-green-50 to-green-100 rounded-2xl overflow-hidden flex-shrink-0 group cursor-pointer">
-                        {review.product_image_url ? (
-                          <img 
-                            src={review.product_image_url} 
-                            alt={review.product_name}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                            onError={(e) => e.target.src = '/placeholder.png'}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ShoppingBag size={32} className="text-green-400" />
-                          </div>
-                        )}
+                        <Link
+                          to={`/recherche-filtre?barcode=${review.product_code}`}
+                          className="block w-full h-full"
+                          title="Voir le produit"
+                        >
+                          {review.product_image_url ? (
+                            <img 
+                              src={review.product_image_url} 
+                              alt={review.product_name}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                              onError={(e) => e.target.src = '/placeholder.png'}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <ShoppingBag size={32} className="text-green-400" />
+                            </div>
+                          )}
+                        </Link>
                       </div>
                       
                       {/* Informations du produit */}
                       <div className="flex-1">
                         <h3 className="text-lg font-bold text-gray-800 mb-1 hover:text-green-600 transition-colors cursor-pointer">
-                          {review.product_name || 'Produit sans nom'}
+                          <Link
+                            to={`/recherche-filtre?barcode=${review.product_code}`}
+                            title="Voir le produit"
+                          >
+                            {review.product_name || 'Produit sans nom'}
+                          </Link>
                         </h3>
                         <div className="flex items-center gap-3 mb-2">
                           <span className="text-sm text-gray-500">EAN: {review.product_code}</span>
@@ -574,6 +704,83 @@ const UserReviews = () => {
                       </Link>
                     </div>
                   </div>
+                  
+                  {/* MODIFIÉ : Affichage de la raison de rejet pour TOUS les avis qui en ont une */}
+                  {review.rejection_reason && (
+                    <div className={`border rounded-xl p-4 mb-4 ${
+                      review.status === 'rejected' || review.status === 'rejected_ia' 
+                        ? 'bg-red-50 border-red-200' 
+                        : 'bg-yellow-50 border-yellow-200'
+                    }`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                            review.status === 'rejected' || review.status === 'rejected_ia'
+                              ? 'bg-red-100'
+                              : 'bg-yellow-100'
+                          }`}>
+                            <AlertTriangle 
+                              size={16} 
+                              className={
+                                review.status === 'rejected' || review.status === 'rejected_ia'
+                                  ? 'text-red-600'
+                                  : 'text-yellow-600'
+                              } 
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className={`text-sm font-semibold mb-2 ${
+                              review.status === 'rejected' || review.status === 'rejected_ia'
+                                ? 'text-red-800'
+                                : 'text-yellow-800'
+                            }`}>
+                              {review.status === 'rejected' || review.status === 'rejected_ia' 
+                                ? 'Avis rejeté' 
+                                : 'Historique de rejet'}
+                            </h4>
+                            <button
+                              onClick={() => toggleRejectionReason(review.id)}
+                              className={`text-sm font-medium flex items-center gap-1 ${
+                                review.status === 'rejected' || review.status === 'rejected_ia'
+                                  ? 'text-red-700 hover:text-red-800'
+                                  : 'text-yellow-700 hover:text-yellow-800'
+                              }`}
+                            >
+                              {expandedRejection[review.id] ? 'Masquer' : 'Voir'} la raison
+                              <ChevronDown 
+                                size={14} 
+                                className={`transform transition-transform duration-200 ${
+                                  expandedRejection[review.id] ? 'rotate-180' : ''
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Raison de rejet (développable) */}
+                      {expandedRejection[review.id] && (
+                        <div className={`mt-3 pt-3 border-t ${
+                          review.status === 'rejected' || review.status === 'rejected_ia'
+                            ? 'border-red-200'
+                            : 'border-yellow-200'
+                        }`}>
+                          <p className={`text-sm leading-relaxed ${
+                            review.status === 'rejected' || review.status === 'rejected_ia'
+                              ? 'text-red-700'
+                              : 'text-yellow-700'
+                          }`}>
+                            {review.rejection_reason}
+                          </p>
+                          {(review.status === 'approved' || review.status === 'approved_auto') && (
+                            <p className="text-xs text-gray-600 mt-2 italic">
+                              ℹ️ Cet avis avait été rejeté puis approuvé par la suite
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   
                   {/* Notes détaillées par critère */}
                   <div className="bg-gray-50 rounded-xl p-4 mb-4">
@@ -645,7 +852,7 @@ const UserReviews = () => {
                           <div>
                             <h4 className="text-sm font-semibold text-gray-800">Ticket de caisse</h4>
                             <p className="text-xs text-gray-500">
-                              {review.authorize_receipt_sharing ? "Visible publiquement" : "Privé"}
+                              {review.allow_public_display ? "Visible publiquement" : "Privé"}
                             </p>
                           </div>
                         </div>
@@ -653,22 +860,22 @@ const UserReviews = () => {
                         <div className="flex items-center gap-2">
                           {/* Toggle partage */}
                           <button
-                            onClick={() => handleToggleSharing(review.id, review.authorize_receipt_sharing)}
+                            onClick={() => handleToggleSharing(review.id, review.allow_public_display)}
                             disabled={toggleSharing[review.id]}
                             className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                              review.authorize_receipt_sharing 
+                              review.allow_public_display 
                                 ? 'bg-green-100 text-green-700 hover:bg-green-200' 
                                 : 'bg-red-100 text-red-700 hover:bg-red-200'
                             }`}
                           >
                             {toggleSharing[review.id] ? (
                               <Loader size={12} className="animate-spin mr-1" />
-                            ) : review.authorize_receipt_sharing ? (
+                            ) : review.allow_public_display ? (
                               <Eye size={12} className="mr-1" />
                             ) : (
                               <EyeOff size={12} className="mr-1" />
                             )}
-                            {review.authorize_receipt_sharing ? "Public" : "Privé"}
+                            {review.allow_public_display ? "Public" : "Privé"}
                           </button>
                           
                           {/* Bouton voir ticket */}
@@ -711,6 +918,29 @@ const UserReviews = () => {
               </div>
             ))}
           </div>
+          
+          {/* NOUVEAU : Bouton Charger plus */}
+          {hasMore && !searchTerm && filterStatus === 'all' && (
+            <div className="text-center mt-8">
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="inline-flex items-center justify-center px-8 py-4 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-all duration-200 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingMore ? (
+                  <>
+                    <Loader size={20} className="animate-spin mr-3" />
+                    Chargement...
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown size={20} className="mr-2" />
+                    Charger plus d'avis ({totalReviews - reviews.length} restants)
+                  </>
+                )}
+              </button>
+            </div>
+          )}
           
           {/* Message si aucun résultat après filtrage */}
           {filteredReviews.length === 0 && (searchTerm || filterStatus !== 'all') && (

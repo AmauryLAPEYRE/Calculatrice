@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useNavigate } from 'react-router-dom';
 import { registerUser, signInWithGoogle } from '../../services/authService';
+import { supabase } from '../../supabaseClient'; // Ajout pour récupérer les pays et langues
 import { 
   Eye, 
   EyeOff, 
@@ -23,30 +24,269 @@ import {
   Zap,
   Trophy,
   Heart,
-  ArrowRight
+  ArrowRight,
+  Globe, // Ajout pour l'icône de langue
+  Crown, // Pour l'abonnement Essential
+  Confetti // Pour l'effet de célébration
 } from 'lucide-react';
 
 const SignUp = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [country, setCountry] = useState('');
   const [city, setCity] = useState('');
   const [postalCode, setPostalCode] = useState('');
-  const [showAddressFields, setShowAddressFields] = useState(false);
+  const [showAddressFields, setShowAddressFields] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false); // Nouveau state pour le popup
+  
+  // Nouveaux states pour les listes
+  const [country, setCountry] = useState('');
+  const [language, setLanguage] = useState(''); // Nouveau champ langue
+  const [countries, setCountries] = useState([]);
+  const [languages, setLanguages] = useState([]);
+  const [loadingCountries, setLoadingCountries] = useState(false);
+  const [loadingLanguages, setLoadingLanguages] = useState(false);
+  
   const navigate = useNavigate();
 
   // Animation au chargement
   useEffect(() => {
     setIsVisible(true);
+    fetchCountries();
+    fetchLanguages();
   }, []);
 
-  // Illustration animée d'inscription
+  // Composant Modal de Succès
+  const SuccessModal = () => (
+    <div className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-500 ${showSuccessModal ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm" onClick={() => setShowSuccessModal(false)} />
+      
+      {/* Modal Content */}
+      <div className={`relative bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all duration-500 ${showSuccessModal ? 'scale-100 rotate-0' : 'scale-95 rotate-3'}`}>
+        {/* Confettis animés */}
+        <div className="absolute -top-10 -left-10 text-yellow-400 animate-bounce-slow">
+          <Sparkles size={40} />
+        </div>
+        <div className="absolute -top-10 -right-10 text-green-400 animate-bounce-slow" style={{ animationDelay: '0.3s' }}>
+          <Star size={35} />
+        </div>
+        <div className="absolute -bottom-10 -left-10 text-blue-400 animate-bounce-slow" style={{ animationDelay: '0.6s' }}>
+          <Gift size={35} />
+        </div>
+        
+        {/* Icône de succès */}
+        <div className="w-24 h-24 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-6 animate-scale-up shadow-lg">
+          <CheckCircle size={48} className="text-white" />
+        </div>
+        
+        {/* Titre */}
+        <h3 className="text-2xl font-bold text-gray-800 text-center mb-4">
+          Bienvenue sur Fydo, {displayName} ! 🎉
+        </h3>
+        
+        {/* Message principal */}
+        <p className="text-gray-600 text-center mb-6">
+          Votre compte a été créé avec succès.
+        </p>
+        
+        {/* Cadeau Essential */}
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-2xl p-5 mb-6 relative overflow-hidden">
+          <div className="absolute top-2 right-2 text-amber-400 animate-pulse">
+            <Crown size={30} />
+          </div>
+          
+          <h4 className="font-bold text-amber-800 mb-2 flex items-center">
+            <Gift className="mr-2" size={20} />
+            Cadeau de bienvenue
+          </h4>
+          
+          <p className="text-amber-700 font-medium text-lg mb-1">
+            1 semaine GRATUITE
+          </p>
+          <p className="text-amber-600 text-sm">
+            Abonnement <span className="font-bold">Essential</span> offert
+          </p>
+          
+          <div className="mt-3 space-y-1">
+            <p className="text-xs text-amber-600 flex items-center">
+              <CheckCircle size={14} className="mr-1" /> Scan illimité de produits
+            </p>
+            <p className="text-xs text-amber-600 flex items-center">
+              <CheckCircle size={14} className="mr-1" /> Tickets de caisse illimités
+            </p>
+            <p className="text-xs text-amber-600 flex items-center">
+              <CheckCircle size={14} className="mr-1" /> Accès aux statistiques avancées
+            </p>
+          </div>
+        </div>
+        
+        {/* Bouton continuer */}
+        <button
+          onClick={() => {
+            setShowSuccessModal(false);
+            navigate('/');
+          }}
+          className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-4 px-6 rounded-xl font-bold shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 active:scale-[0.98] flex items-center justify-center group"
+        >
+          <span>Découvrir Fydo</span>
+          <ArrowRight size={20} className="ml-2 transform group-hover:translate-x-1 transition-transform" />
+        </button>
+        
+        {/* Note de bas de page */}
+        <p className="text-xs text-gray-500 text-center mt-4">
+          Aucune carte bancaire requise • Sans engagement
+        </p>
+      </div>
+    </div>
+  );
+
+  // Fonction pour récupérer les pays actifs
+  const fetchCountries = async () => {
+    setLoadingCountries(true);
+    try {
+      const { data, error } = await supabase
+        .from('countries')
+        .select('code, name_fr, name_en')
+        .eq('is_active', true)
+        .order('name_fr', { ascending: true });
+
+      if (error) throw error;
+      setCountries(data || []);
+          // Auto-sélection de la France si elle existe dans la liste
+    const franceExists = data?.some(country => country.code === 'FR');
+    if (franceExists && !country) { // Seulement si aucun pays n'est déjà sélectionné
+      setCountry('FR');
+    }
+    } catch (error) {
+      console.error('Erreur lors du chargement des pays:', error);
+    } finally {
+      setLoadingCountries(false);
+    }
+  };
+
+  // Fonction pour récupérer les langues actives
+  const fetchLanguages = async () => {
+    setLoadingLanguages(true);
+    try {
+      const { data, error } = await supabase
+        .from('languages')
+        .select('code, name_fr, name_en, name_native')
+        .eq('is_active', true)
+        .order('name_fr', { ascending: true });
+
+      if (error) throw error;
+      setLanguages(data || []);
+
+          // Auto-sélection du français
+    const frenchExists = data?.some(lang => lang.code === 'fr');
+    if (frenchExists && !language) { // Seulement si aucune langue n'est déjà sélectionnée
+      setLanguage('fr');
+    }
+    } catch (error) {
+      console.error('Erreur lors du chargement des langues:', error);
+    } finally {
+      setLoadingLanguages(false);
+    }
+  };
+// 3. ALTERNATIVE : Fonction pour détecter automatiquement la langue du navigateur
+const detectBrowserLanguage = () => {
+  // Récupère la langue du navigateur
+  const browserLang = navigator.language || navigator.userLanguage;
+  const langCode = browserLang.split('-')[0].toLowerCase(); // ex: 'fr-FR' -> 'fr'
+  
+  return langCode;
+};
+
+  // 4. ALTERNATIVE : Fonction plus sophistiquée avec détection automatique
+const setupDefaultSelections = (countries, languages) => {
+  // Auto-sélection du pays (France par défaut)
+  if (countries.length > 0 && !country) {
+    const franceExists = countries.some(c => c.code === 'FR');
+    if (franceExists) {
+      setCountry('FR');
+    }
+  }
+  
+  // Auto-sélection de la langue (basée sur le navigateur ou français par défaut)
+  if (languages.length > 0 && !language) {
+    const browserLang = detectBrowserLanguage();
+    const browserLangExists = languages.some(l => l.code === browserLang);
+    
+    if (browserLangExists) {
+      setLanguage(browserLang);
+    } else {
+      // Fallback vers le français si disponible
+      const frenchExists = languages.some(l => l.code === 'fr');
+      if (frenchExists) {
+        setLanguage('fr');
+      }
+    }
+  }
+};
+
+// 6. Ajoutez un nouvel useEffect pour gérer les sélections par défaut
+useEffect(() => {
+  // Attendre que les deux listes soient chargées
+  if (countries.length > 0 && languages.length > 0) {
+    setupDefaultSelections(countries, languages);
+  }
+}, [countries, languages]); // Se déclenche quand les données sont chargées
+
+// 7. OPTION BONUS : Fonction pour détecter le pays via l'IP (nécessite une API externe)
+const detectCountryByIP = async () => {
+  try {
+    // Utilise une API gratuite pour détecter le pays
+    const response = await fetch('https://ipapi.co/json/');
+    const data = await response.json();
+    return data.country_code; // Retourne le code pays (ex: 'FR')
+  } catch (error) {
+    console.error('Erreur détection pays:', error);
+    return 'FR'; // Fallback vers France
+  }
+};
+// 8. VERSION AVANCÉE avec détection IP (optionnelle)
+const setupAdvancedDefaults = async (countries, languages) => {
+  // Détection du pays
+  if (countries.length > 0 && !country) {
+    try {
+      const detectedCountry = await detectCountryByIP();
+      const countryExists = countries.some(c => c.code === detectedCountry);
+      if (countryExists) {
+        setCountry(detectedCountry);
+      } else {
+        // Fallback vers France
+        const franceExists = countries.some(c => c.code === 'FR');
+        if (franceExists) setCountry('FR');
+      }
+    } catch {
+      // En cas d'erreur, utiliser France par défaut
+      const franceExists = countries.some(c => c.code === 'FR');
+      if (franceExists) setCountry('FR');
+    }
+  }
+  
+  // Détection de la langue (identique à la version précédente)
+  if (languages.length > 0 && !language) {
+    const browserLang = detectBrowserLanguage();
+    const browserLangExists = languages.some(l => l.code === browserLang);
+    
+    if (browserLangExists) {
+      setLanguage(browserLang);
+    } else {
+      const frenchExists = languages.some(l => l.code === 'fr');
+      if (frenchExists) setLanguage('fr');
+    }
+  }
+};
+
+
+  // Illustration animée d'inscription (inchangée)
   const SignUpIllustration = () => (
     <svg viewBox="0 0 400 400" className="w-full h-auto">
       <defs>
@@ -152,10 +392,21 @@ const SignUp = () => {
     try {
       await registerUser(email, password, displayName, {
         country, 
+        language, // Ajout du champ langue
         city, 
         postalCode
       });
-      navigate('/');
+      
+      // Afficher le modal de succès
+      setShowSuccessModal(true);
+      
+      // Redirection après 5 secondes si l'utilisateur ne clique pas
+      setTimeout(() => {
+        if (showSuccessModal) {
+          navigate('/');
+        }
+      }, 5000);
+      
     } catch (error) {
       let errorMessage = '';
       switch (error.code) {
@@ -188,7 +439,18 @@ const SignUp = () => {
       const result = await signInWithGoogle();
       
       if (result) {
-        navigate('/');
+        // Récupérer le displayName pour le popup
+        const googleDisplayName = result.user?.displayName || result.user?.email?.split('@')[0] || 'Utilisateur';
+        setDisplayName(googleDisplayName);
+        
+        // Afficher aussi le modal pour Google
+        setShowSuccessModal(true);
+        
+        setTimeout(() => {
+          if (showSuccessModal) {
+            navigate('/');
+          }
+        }, 5000);
       }
       
     } catch (error) {
@@ -211,6 +473,9 @@ const SignUp = () => {
         <meta name="description" content="Créez votre compte Fydo gratuitement et rejoignez des milliers d'utilisateurs qui partagent des avis vérifiés sur leurs produits du quotidien." />
       </Helmet>
 
+      {/* Modal de succès */}
+      <SuccessModal />
+
       <div className="container mx-auto px-4">
         <div className="max-w-6xl mx-auto">
           
@@ -225,7 +490,7 @@ const SignUp = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             
-            {/* Section gauche - Illustration et avantages */}
+            {/* Section gauche - Illustration et avantages (inchangée) */}
             <div className={`transition-all duration-700 ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'}`}>
               <h1 className="text-4xl md:text-5xl font-bold text-green-800 mb-6">
                 Rejoignez la <span className="text-green-600">révolution</span> des avis authentiques
@@ -344,25 +609,6 @@ const SignUp = () => {
                 </div>
                 
                 <form onSubmit={handleSubmit}>
-                  <div className="mb-5">
-                    <label className="block text-gray-700 text-sm font-medium mb-3" htmlFor="displayName">
-                      Nom d'utilisateur
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <User size={20} className="text-gray-400" />
-                      </div>
-                      <input
-                        type="text"
-                        id="displayName"
-                        className="w-full pl-12 pr-4 py-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        placeholder="Choisissez un pseudo"
-                        required
-                      />
-                    </div>
-                  </div>
                   
                   <div className="mb-5">
                     <label className="block text-gray-700 text-sm font-medium mb-3" htmlFor="email">
@@ -416,44 +662,94 @@ const SignUp = () => {
                     </div>
                     <p className="text-xs text-gray-500 mt-2">Le mot de passe doit contenir au moins 6 caractères</p>
                   </div>
-                  
-                  {/* Bouton pour afficher/masquer les champs d'adresse */}
-                  <button
-                    type="button"
-                    className="w-full py-3 px-4 mb-5 border-2 border-green-200 rounded-xl hover:border-green-300 hover:bg-green-50 flex items-center justify-center transition-all transform hover:scale-[1.01]"
-                    onClick={() => setShowAddressFields(!showAddressFields)}
-                  >
-                    <MapPin size={20} className="mr-3 text-green-700" />
-                    <span className="text-green-700 font-medium">
-                      {showAddressFields ? 'Masquer les informations d\'adresse' : 'Ajouter une adresse (optionnel)'}
-                    </span>
-                    {showAddressFields ? (
-                      <ChevronUp size={20} className="ml-auto text-green-700" />
-                    ) : (
-                      <ChevronDown size={20} className="ml-auto text-green-700" />
-                    )}
-                  </button>
+                   <div className="mb-5">
+                    <label className="block text-gray-700 text-sm font-medium mb-3" htmlFor="displayName">
+                      Nom d'utilisateur
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <User size={20} className="text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        id="displayName"
+                        className="w-full pl-12 pr-4 py-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        placeholder="Choisissez un pseudo"
+                        required
+                      />
+                    </div>
+                  </div>                 
                   
                   {/* Champs d'adresse (conditionnellement affichés) */}
                   {showAddressFields && (
                     <div className="mb-6 border-2 border-green-200 p-5 rounded-xl bg-green-50 animate-expand">
                       <h3 className="text-lg font-medium text-green-800 mb-4 flex items-center">
                         <MapPin size={20} className="mr-3" />
-                        Informations d'adresse
+                        Informations d'adresse (optionnelles)
                       </h3>
                       
+                      {/* Champ Pays modifié */}
                       <div className="mb-4">
                         <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="country">
                           Pays
                         </label>
-                        <input
-                          type="text"
-                          id="country"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                          value={country}
-                          onChange={(e) => setCountry(e.target.value)}
-                          placeholder="France"
-                        />
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <MapPin size={16} className="text-gray-400" />
+                          </div>
+                          <select
+                            id="country"
+                            className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all appearance-none bg-white"
+                            value={country}
+                            onChange={(e) => setCountry(e.target.value)}
+                            disabled={loadingCountries}
+                          >
+                            <option value="">
+                              {loadingCountries ? 'Chargement...' : 'Sélectionnez un pays'}
+                            </option>
+                            {countries.map((countryItem) => (
+                              <option key={countryItem.code} value={countryItem.code}>
+                                {countryItem.name_fr}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                            <ChevronDown size={16} className="text-gray-400" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Nouveau champ Langue */}
+                      <div className="mb-4">
+                        <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="language">
+                          Langue préférée
+                        </label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <Globe size={16} className="text-gray-400" />
+                          </div>
+                          <select
+                            id="language"
+                            className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all appearance-none bg-white"
+                            value={language}
+                            onChange={(e) => setLanguage(e.target.value)}
+                            disabled={loadingLanguages}
+                          >
+                            <option value="">
+                              {loadingLanguages ? 'Chargement...' : 'Sélectionnez une langue'}
+                            </option>
+                            {languages.map((languageItem) => (
+                              <option key={languageItem.code} value={languageItem.code}>
+                                {languageItem.name_fr} ({languageItem.name_native})
+                              </option>
+                            ))}
+                          </select>
+                          <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                            <ChevronDown size={16} className="text-gray-400" />
+                          </div>
+                        </div>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-4">
@@ -542,7 +838,7 @@ const SignUp = () => {
             </div>
           </div>
 
-          {/* Section garanties */}
+          {/* Section garanties (inchangée) */}
           <div className={`mt-16 grid grid-cols-1 md:grid-cols-3 gap-6 transition-all duration-700 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <div className="bg-white rounded-2xl p-6 shadow-lg border border-green-100 text-center">
               <Shield size={32} className="text-green-600 mx-auto mb-4" />
@@ -586,12 +882,38 @@ const SignUp = () => {
           }
         }
         
+        @keyframes scale-up {
+          from {
+            transform: scale(0);
+          }
+          to {
+            transform: scale(1);
+          }
+        }
+        
+        @keyframes bounce-slow {
+          0%, 100% {
+            transform: translateY(0) rotate(0deg);
+          }
+          50% {
+            transform: translateY(-20px) rotate(10deg);
+          }
+        }
+        
         .animate-shake {
           animation: shake 0.5s ease-in-out;
         }
         
         .animate-expand {
           animation: expand 0.3s ease-out;
+        }
+        
+        .animate-scale-up {
+          animation: scale-up 0.5s ease-out;
+        }
+        
+        .animate-bounce-slow {
+          animation: bounce-slow 3s ease-in-out infinite;
         }
       `}</style>
     </section>

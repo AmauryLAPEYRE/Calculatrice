@@ -55,6 +55,62 @@ const UserProfileModal = ({ userId, userName, isOpen, onClose }) => {
     }
   };
 
+  // Fonction pour obtenir les couleurs du drapeau selon le code pays
+  const getCountryColors = (countryCode) => {
+    const countryColors = {
+      'FR': 'linear-gradient(to right, #0055a4 33%, #ffffff 33%, #ffffff 66%, #ef4135 66%)', // France: Bleu, Blanc, Rouge
+      'BE': 'linear-gradient(to right, #000000 33%, #fdda24 33%, #fdda24 66%, #ef3478 66%)', // Belgique: Noir, Jaune, Rouge
+      'CH': 'linear-gradient(45deg, #ff0000 25%, #ffffff 25%, #ffffff 75%, #ff0000 75%)', // Suisse: Rouge et Blanc
+      'CA': 'linear-gradient(to right, #ff0000 25%, #ffffff 25%, #ffffff 75%, #ff0000 75%)', // Canada: Rouge et Blanc
+      'LU': 'linear-gradient(to bottom, #ed2939 50%, #ffffff 50%, #ffffff 50%, #00a1de 50%)', // Luxembourg: Rouge, Blanc, Bleu
+      'DE': 'linear-gradient(to bottom, #000000 33%, #dd0000 33%, #dd0000 66%, #ffce00 66%)', // Allemagne: Noir, Rouge, Jaune
+      'IT': 'linear-gradient(to right, #009246 33%, #ffffff 33%, #ffffff 66%, #ce2b37 66%)', // Italie: Vert, Blanc, Rouge
+      'ES': 'linear-gradient(to bottom, #c60b1e 25%, #ffc400 25%, #ffc400 75%, #c60b1e 75%)', // Espagne: Rouge, Jaune, Rouge
+      'PT': 'linear-gradient(to right, #046a38 40%, #da020e 40%)', // Portugal: Vert, Rouge
+      'NL': 'linear-gradient(to bottom, #21468b 33%, #ffffff 33%, #ffffff 66%, #ae1c28 66%)', // Pays-Bas: Rouge, Blanc, Bleu
+      'GB': 'linear-gradient(45deg, #012169 25%, #ffffff 25%, #ffffff 50%, #c8102e 50%)', // Royaume-Uni: Bleu, Blanc, Rouge
+      'US': 'linear-gradient(45deg, #b22234 25%, #ffffff 25%, #ffffff 50%, #3c3b6e 50%)', // États-Unis: Rouge, Blanc, Bleu
+      'MA': 'linear-gradient(45deg, #c1272d 50%, #006233 50%)', // Maroc: Rouge et Vert
+      'DZ': 'linear-gradient(to right, #006233 50%, #ffffff 50%)', // Algérie: Vert et Blanc
+      'TN': 'linear-gradient(45deg, #e70013 50%, #ffffff 50%)', // Tunisie: Rouge et Blanc
+      'SN': 'linear-gradient(to right, #00853f 33%, #fdef42 33%, #fdef42 66%, #e31b23 66%)', // Sénégal: Vert, Jaune, Rouge
+      'CI': 'linear-gradient(to right, #f77f00 33%, #ffffff 33%, #ffffff 66%, #009639 66%)', // Côte d'Ivoire: Orange, Blanc, Vert
+      'CM': 'linear-gradient(to right, #007a5e 33%, #ce1126 33%, #ce1126 66%, #fcd116 66%)', // Cameroun: Vert, Rouge, Jaune
+      'BF': 'linear-gradient(to bottom, #ef2b2d 50%, #00853f 50%)', // Burkina Faso: Rouge, Vert
+      'ML': 'linear-gradient(to right, #14b53a 33%, #fcd116 33%, #fcd116 66%, #ce1126 66%)', // Mali: Vert, Jaune, Rouge
+      'MG': 'linear-gradient(to right, #ffffff 33%, #fc3d32 33%, #fc3d32 66%, #007e3a 66%)', // Madagascar: Blanc, Rouge, Vert
+    };
+    return countryColors[countryCode] || null;
+  };
+
+  // Fonction pour obtenir le nom du pays selon le code
+  const getCountryName = (countryCode) => {
+    const countryNames = {
+      'FR': 'France',
+      'BE': 'Belgique',
+      'CH': 'Suisse',
+      'CA': 'Canada',
+      'LU': 'Luxembourg',
+      'DE': 'Allemagne',
+      'IT': 'Italie',
+      'ES': 'Espagne',
+      'PT': 'Portugal',
+      'NL': 'Pays-Bas',
+      'GB': 'Royaume-Uni',
+      'US': 'États-Unis',
+      'MA': 'Maroc',
+      'DZ': 'Algérie',
+      'TN': 'Tunisie',
+      'SN': 'Sénégal',
+      'CI': 'Côte d\'Ivoire',
+      'CM': 'Cameroun',
+      'BF': 'Burkina Faso',
+      'ML': 'Mali',
+      'MG': 'Madagascar',
+    };
+    return countryNames[countryCode] || countryCode;
+  };
+
   // Fonction pour obtenir les infos de niveau/statut
   const getLevelInfo = (status) => {
     const levels = {
@@ -112,6 +168,9 @@ const UserProfileModal = ({ userId, userName, isOpen, onClose }) => {
   };
 
   const levelInfo = profileData ? getLevelInfo(profileData.profile?.status) : getLevelInfo('bronze');
+  const countryCode = profileData?.profile?.country;
+  const countryColors = countryCode ? getCountryColors(countryCode) : null;
+  const countryName = countryCode ? getCountryName(countryCode) : null;
 
   // Si la modal n'est pas ouverte, ne rien rendre
   if (!isOpen) return null;
@@ -153,6 +212,18 @@ const UserProfileModal = ({ userId, userName, isOpen, onClose }) => {
                 <div className="w-24 h-24 bg-white bg-opacity-20 backdrop-blur-sm rounded-full flex items-center justify-center text-4xl font-bold shadow-xl">
                   {userName?.charAt(0).toUpperCase() || 'U'}
                 </div>
+                
+                {/* Pastille du drapeau du pays - positionnée en haut à gauche */}
+                {countryColors && (
+                  <div 
+                    className="absolute -top-1 -left-1 w-8 h-8 rounded-full shadow-lg border-2 border-white animate-pulse"
+                    style={{ 
+                      background: countryColors 
+                    }}
+                    title={countryName}
+                  />
+                )}
+                
                 {/* Badge de niveau animé */}
                 <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg animate-bounce">
                   <span className="text-2xl">{levelInfo.emoji}</span>

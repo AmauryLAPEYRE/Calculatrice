@@ -78,22 +78,7 @@ const ReceiptConfirmation = ({ authorizeReceiptSharing, onAuthorizeReceiptSharin
         Ticket de caisse validé
       </p>
 
-      <div className="flex items-center">
-        <input
-          type="checkbox"
-          id="authorizeSharing"
-          className="mr-2 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-          checked={authorizeReceiptSharing}
-          onChange={(e) => onAuthorizeReceiptSharingChange(e.target.checked)}
-        />
-        <label htmlFor="authorizeSharing" className="text-sm text-gray-700">
-          J'autorise le partage anonymisé de mon ticket de caisse
-        </label>
-      </div>
-      <p className="text-xs text-gray-500 mt-1">
-        Cette option permet aux autres utilisateurs de voir votre ticket pour vérifier l'authenticité de l'avis.
-        Votre ticket sera anonymisé avant d'être partagé.
-      </p>
+
     </div>
   );
 };
@@ -206,7 +191,8 @@ const SelectedItemDisplay = ({ selectedItem, matchScore, isItemListExpanded, onT
           aria-label={isItemListExpanded ? "Masquer la liste d'articles" : "Afficher la liste d'articles"}
         >
           {isItemListExpanded ? (
-            <ChevronUp size={20} />
+            <ChevronUp size={20}  /> 
+            
           ) : (
             <ChevronDown size={20} />
           )}
