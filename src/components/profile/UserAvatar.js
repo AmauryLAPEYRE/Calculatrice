@@ -26,7 +26,7 @@ setInterval(cleanupCache, 1000 * 60 * 30);
  * @param {Object} props
  * @param {string} props.userId - ID unique de l'utilisateur (Firebase UID)
  * @param {number} props.size - Taille de l'avatar en pixels (défaut: 50)
- * @param {string} props.status - Statut de l'utilisateur (bronze, argent, or, diamant)
+ * @param {string} props.status - Statut de l'utilisateur (nouveau, bronze, argent, or, diamant)
  * @param {string} props.className - Classes CSS additionnelles
  * @param {string} props.displayName - Nom d'affichage pour le fallback
  * @param {boolean} props.showBorder - Afficher la bordure colorée selon le statut
@@ -38,7 +38,7 @@ setInterval(cleanupCache, 1000 * 60 * 30);
 const UserAvatar = ({ 
   userId, 
   size = 50, 
-  status = 'bronze', 
+  status = 'nouveau', 
   className = '', 
   displayName = '',
   showBorder = true,
@@ -54,16 +54,16 @@ const UserAvatar = ({
   
   // Couleurs par statut cohérentes avec ChallengesPage
   const colorsByStatus = {
-    nouveau: ['e5e7eb', 'f3f4f6'],  // Gris clair pour nouveau
-    bronze: ['fef3c7', 'fed7aa'],  // Jaune/orange clair
-    argent: ['e5e7eb', 'f3f4f6'],  // Gris clair
-    or: ['fef3c7', 'fde68a'],       // Doré
-    diamant: ['dbeafe', 'e0e7ff']   // Bleu clair
+    nouveau: ['d4f3e1', 'e6f7ea'],     // Verts clairs Fydo pour nouveau
+    bronze: ['fef3c7', 'fed7aa'],      // Jaune/orange clair
+    argent: ['e5e7eb', 'f3f4f6'],      // Gris clair
+    or: ['fef3c7', 'fde68a'],          // Doré
+    diamant: ['dbeafe', 'e0e7ff']      // Bleu clair
   };
   
   // Bordures par statut
   const borderColorsByStatus = {
-    nouveau: 'border-gray-300',
+    nouveau: 'border-green-300',
     bronze: 'border-amber-300',
     argent: 'border-gray-300',
     or: 'border-yellow-400',
@@ -220,11 +220,11 @@ export const preloadAvatars = (users) => {
   users.forEach(user => {
     if (!user.userId) return;
     
-    const cacheKey = `${user.userId}-${user.size || 50}-${user.status || 'bronze'}`;
+    const cacheKey = `${user.userId}-${user.size || 50}-${user.status || 'nouveau'}`;
     
     if (!avatarCache.has(cacheKey)) {
       const colors = {
-        nouveau: ['e5e7eb', 'f3f4f6'],
+        nouveau: ['d4f3e1', 'e6f7ea'],
         bronze: ['fef3c7', 'fed7aa'],
         argent: ['e5e7eb', 'f3f4f6'],
         or: ['fef3c7', 'fde68a'],
@@ -257,7 +257,7 @@ export const useUserAvatar = () => {
   const avatarProps = {
     userId: userDetails?.firebase_uid || currentUser?.uid,
     displayName: userDetails?.display_name || currentUser?.displayName,
-    status: userDetails?.status || 'bronze',
+    status: userDetails?.status || 'nouveau',
     customAvatarUrl: userDetails?.avatar_url || '',
     avatarSeed: userDetails?.avatar_seed || ''
   };

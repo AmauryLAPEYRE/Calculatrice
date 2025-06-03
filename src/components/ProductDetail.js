@@ -1,4 +1,4 @@
-// src/components/ProductDetail.js - Version modifiée
+// src/components/ProductDetail.js - Version modifiée avec étoiles précises
 import React, { useState, useEffect, useRef } from 'react';
 import PriceHistory from './Review/PriceHistory';
 import { 
@@ -66,6 +66,39 @@ const ProductDetail = ({ product }) => {
   
   const menuRef = useRef(null);
   const { currentUser, userDetails } = useAuth();
+
+  // NOUVELLE FONCTION : Affichage d'étoiles avec remplissage précis
+  const renderPreciseStars = (rating, size = 20) => {
+    const ratingNum = parseFloat(rating) || 0;
+
+    return (
+      <div className="flex">
+        {[1, 2, 3, 4, 5].map((star) => {
+          let fillPercentage = 0;
+
+          if (ratingNum >= star) {
+            fillPercentage = 100;
+          } else if (ratingNum > star - 1) {
+            fillPercentage = Math.round((ratingNum - (star - 1)) * 100);
+          }
+
+          return (
+            <div key={star} className="relative" style={{ width: size, height: size }}>
+              <Star size={size} className="absolute text-gray-300" />
+              {fillPercentage > 0 && (
+                <div 
+                  className="absolute overflow-hidden" 
+                  style={{ width: `${fillPercentage}%`, height: '100%' }}
+                >
+                  <Star size={size} className="text-yellow-400 fill-yellow-400" />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   useEffect(() => {
     setIsVisible(true);
@@ -449,7 +482,7 @@ const ProductDetail = ({ product }) => {
               </div>
             </div>
 
-            {/* MEGA SECTION NOTATION - LE POINT FOCAL - VERSION RESPONSIVE */}
+            {/* MEGA SECTION NOTATION - LE POINT FOCAL - VERSION RESPONSIVE AVEC ÉTOILES PRÉCISES */}
             <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl p-4 sm:p-6 shadow-xl transform hover:scale-[1.02] transition-all duration-300">
               <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
                 <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 lg:space-x-6">
@@ -458,18 +491,9 @@ const ProductDetail = ({ product }) => {
                     <div className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white">
                       {displayStats.average_rating ? displayStats.average_rating.toFixed(2) : '0.00'}
                     </div>
+                    {/* MODIFICATION : Utilisation des étoiles précises */}
                     <div className="flex justify-center mt-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star 
-                          key={star} 
-                          size={20} 
-                          className={`sm:w-6 sm:h-6 ${
-                            star <= Math.round(displayStats.average_rating || 0) 
-                              ? "text-yellow-400 fill-yellow-400" 
-                              : "text-white/30"
-                          }`} 
-                        />
-                      ))}
+                      {renderPreciseStars(displayStats.average_rating || 0, 24)}
                     </div>
                   </div>
                   
@@ -520,7 +544,7 @@ const ProductDetail = ({ product }) => {
                 </button>
               </div>
 
-              {/* NOUVEAU : Affichage des critères spécialisés dans la section notation */}
+              {/* NOUVEAU : Affichage des critères spécialisés dans la section notation AVEC ÉTOILES PRÉCISES */}
               {productCriterias.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-white/20">
                   {productCriterias.slice(0, 3).map((criteria, index) => {
@@ -535,8 +559,11 @@ const ProductDetail = ({ product }) => {
                         <p className="text-green-100 text-xs sm:text-sm mb-1 truncate">
                           {criteria.display_name}
                         </p>
+                        {/* MODIFICATION : Utilisation des étoiles précises pour les critères */}
+                        <div className="flex items-center justify-center mb-1">
+                          {renderPreciseStars(ratingValue || 0, 16)}
+                        </div>
                         <div className="flex items-center justify-center">
-                          <Star size={14} className="sm:w-4 sm:h-4 text-yellow-400 fill-yellow-400 mr-1" />
                           <span className="text-white font-bold text-sm sm:text-base">
                             {ratingValue > 0 ? ratingValue.toFixed(2) : '0.0'}
                           </span>
@@ -563,9 +590,6 @@ const ProductDetail = ({ product }) => {
                 />
               </div>
             )}
-
-            {/* Prix moyen et favoris - RESPONSIVE */}
-
 
             {/* NOUVEAU : Indicateur de chargement ou d'erreur des critères */}
             {criteriasLoading && (
