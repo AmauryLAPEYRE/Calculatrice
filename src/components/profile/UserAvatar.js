@@ -54,6 +54,7 @@ const UserAvatar = ({
   
   // Couleurs par statut cohérentes avec ChallengesPage
   const colorsByStatus = {
+    nouveau: ['e5e7eb', 'f3f4f6'],  // Gris clair pour nouveau
     bronze: ['fef3c7', 'fed7aa'],  // Jaune/orange clair
     argent: ['e5e7eb', 'f3f4f6'],  // Gris clair
     or: ['fef3c7', 'fde68a'],       // Doré
@@ -62,6 +63,7 @@ const UserAvatar = ({
   
   // Bordures par statut
   const borderColorsByStatus = {
+    nouveau: 'border-gray-300',
     bronze: 'border-amber-300',
     argent: 'border-gray-300',
     or: 'border-yellow-400',
@@ -70,7 +72,7 @@ const UserAvatar = ({
   
   // Obtenir la couleur de fond selon le statut
   const getBackgroundColor = () => {
-    const colors = colorsByStatus[status?.toLowerCase()] || colorsByStatus.bronze;
+    const colors = colorsByStatus[status?.toLowerCase()] || colorsByStatus.nouveau;
     // Sélectionner aléatoirement une des deux couleurs basée sur l'userId
     const colorIndex = userId ? userId.charCodeAt(0) % colors.length : 0;
     return colors[colorIndex];
@@ -147,7 +149,7 @@ const UserAvatar = ({
   
   // Classes de base
   const baseClasses = `relative inline-block rounded-full overflow-hidden transition-all duration-300`;
-  const borderClass = showBorder ? `ring-2 ${borderColorsByStatus[status?.toLowerCase()] || borderColorsByStatus.bronze}` : '';
+  const borderClass = showBorder ? `ring-2 ${borderColorsByStatus[status?.toLowerCase()] || borderColorsByStatus.nouveau}` : '';
   
   // Style de taille
   const sizeStyle = {
@@ -222,13 +224,14 @@ export const preloadAvatars = (users) => {
     
     if (!avatarCache.has(cacheKey)) {
       const colors = {
+        nouveau: ['e5e7eb', 'f3f4f6'],
         bronze: ['fef3c7', 'fed7aa'],
         argent: ['e5e7eb', 'f3f4f6'],
         or: ['fef3c7', 'fde68a'],
         diamant: ['dbeafe', 'e0e7ff']
       };
       
-      const statusColors = colors[user.status?.toLowerCase()] || colors.bronze;
+      const statusColors = colors[user.status?.toLowerCase()] || colors.nouveau;
       const colorIndex = user.userId.charCodeAt(0) % statusColors.length;
       const bgColor = statusColors[colorIndex];
       

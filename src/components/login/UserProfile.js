@@ -35,6 +35,7 @@ import {
   User
 } from 'lucide-react';
 import ProfileLayout from '../profile/ProfileLayout';
+import UserAvatar from '../profile/UserAvatar';
 
 const UserProfile = () => {
   const { currentUser, logout, userDetails } = useAuth();
@@ -165,28 +166,32 @@ const UserProfile = () => {
         textColor: 'text-amber-700',
         bgColor: 'bg-amber-50',
         icon: <Award size={20} />,
-        description: 'Membre débutant'
+        description: 'Membre débutant',
+        emoji: '🥉'
       },
       argent: {
         color: 'from-gray-300 to-gray-500',
         textColor: 'text-gray-700',
         bgColor: 'bg-gray-50',
         icon: <Award size={20} />,
-        description: 'Membre actif'
+        description: 'Membre actif',
+        emoji: '🥈'
       },
       or: {
         color: 'from-yellow-400 to-yellow-600',
         textColor: 'text-yellow-700',
         bgColor: 'bg-yellow-50',
         icon: <Trophy size={20} />,
-        description: 'Membre expert'
+        description: 'Membre expert',
+        emoji: '🥇'
       },
       diamant: {
         color: 'from-blue-400 to-blue-600',
         textColor: 'text-blue-700',
         bgColor: 'bg-blue-50',
         icon: <Crown size={20} />,
-        description: 'Membre élite'
+        description: 'Membre élite',
+        emoji: '💎'
       }
     };
     
@@ -271,6 +276,14 @@ const UserProfile = () => {
         <meta name="description" content="Gérez votre profil Fydo, consultez vos statistiques et vos abonnements" />
       </Helmet>
 
+      {/* Header avec titre stylisé */}
+      <div className={`text-center mb-8 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+        <h1 className="text-2xl md:text-3xl font-bold text-green-800 mb-3">
+          Vue <span className="text-green-600">d'ensemble</span>
+        </h1>
+        <p className="text-base text-green-700">Gérez votre profil et consultez vos statistiques</p>
+      </div>
+
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start animate-shake">
           <AlertCircle size={20} className="text-red-600 mr-3 flex-shrink-0 mt-0.5" />
@@ -286,13 +299,16 @@ const UserProfile = () => {
           <div className={`transition-all duration-700 ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'}`}>
             <div className="flex items-center mb-6">
               <div className="relative">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-green-600 to-green-800 text-white flex items-center justify-center text-4xl font-bold shadow-xl">
-                  {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'F'}
-                </div>
-                {/* Badge de statut */}
-                <div className={`absolute -bottom-2 -right-2 w-10 h-10 rounded-full bg-gradient-to-br ${statusInfo.color} flex items-center justify-center text-white shadow-lg`}>
-                  {statusInfo.icon}
-                </div>
+                <UserAvatar 
+                  userId={userDetails?.firebase_uid || currentUser?.uid}
+                  size={96}
+                  status={userDetails?.status || 'bronze'}
+                  displayName={currentUser?.displayName || currentUser?.email}
+                  customAvatarUrl={userDetails?.avatarUrl}
+                  avatarSeed={userDetails?.avatarSeed}
+                  className="shadow-xl"
+                  showBorder={true}
+                />
               </div>
               
               <div className="ml-6">
@@ -304,7 +320,8 @@ const UserProfile = () => {
                 
                 {/* Badge de statut avec description */}
                 <div className="mt-3 inline-flex items-center">
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r ${statusInfo.color} text-white shadow-md`}>
+                  <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-gradient-to-r ${statusInfo.color} text-white shadow-md`}>
+                    <span className="mr-1">{statusInfo.emoji}</span>
                     <span className="capitalize">{userDetails?.status || 'Bronze'}</span>
                   </span>
                   <span className="ml-3 text-sm text-gray-600">{statusInfo.description}</span>

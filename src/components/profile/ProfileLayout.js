@@ -41,7 +41,7 @@ const ProfileLayout = ({ children, title }) => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto mt-8 px-4 mb-20 md:mb-12 has-bottom-nav">
+    <div className="max-w-6xl mx-auto mt-20 px-4 mb-20 md:mb-12 has-bottom-nav">
       {/* Barre de navigation mobile visible uniquement sur petits écrans */}
       <div className="md:hidden mb-4">
         <ProfileMobileNavbar 
@@ -54,22 +54,21 @@ const ProfileLayout = ({ children, title }) => {
         />
       </div>
       
-      <div className="flex flex-col md:flex-row gap-6">
+      <div className="flex flex-col md:flex-row gap-6 items-start">
         {/* Menu latéral réutilisable - visible uniquement sur desktop */}
         <div className="hidden md:block md:w-64 md:shrink-0">
-          <ProfileSidebar 
-            currentUser={currentUser} 
-            onLogout={handleLogout} 
-            loading={loading} 
-          />
+          <div className="sticky top-32">
+            <ProfileSidebar 
+              currentUser={currentUser} 
+              onLogout={handleLogout} 
+              loading={loading} 
+            />
+          </div>
         </div>
         
         {/* Contenu principal avec une hauteur minimale fixe pour éviter les sauts */}
         <div className="flex-1 w-full">
-          <div className="bg-white p-6 rounded-lg shadow-md min-h-[550px] profile-content">
-            {/* Titre visible uniquement sur desktop, car déjà inclus dans la navbar mobile */}
-            <h2 className="text-2xl font-bold mb-6 hidden md:block">{title}</h2>
-            
+          <div className="bg-white rounded-2xl shadow-xl min-h-[550px] profile-content border border-green-100 p-6 md:p-8">
             {/* Contenu enfant (les différentes pages de profil) */}
             {children}
           </div>

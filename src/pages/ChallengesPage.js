@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import UserAvatar from '../components/profile/UserAvatar';
+import { calculateUserStatus, buildUserProgress } from '../utils/statusCalculator';
 import { 
   Trophy, 
   Star, 
@@ -38,19 +39,14 @@ const ChallengesPage = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [hoveredChallenge, setHoveredChallenge] = useState(null);
 
-  // Utiliser directement les données du contexte sans état local pour éviter les boucles
-  const userProgress = useMemo(() => ({
-    currentStatus: userDetails?.status || 'bronze',
-    currentPoints: 0, // Sera calculé plus tard si nécessaire
-    totalScans: userDetails?.scanCount || 0,
-    totalReviews: userDetails?.reviewCount || 0,
-    totalFavorites: userDetails?.favoriteCount || 0,
-    totalLikes: Math.floor((userDetails?.reviewCount || 0) * 2), // Estimation
-    firstReviews: Math.floor((userDetails?.reviewCount || 0) * 0.2), // Estimation
-    categories: Math.min(Math.floor((userDetails?.reviewCount || 0) / 5), 10), // Estimation
-    daysConnected: 7, // Valeur par défaut
-    profileComplete: !!(userDetails?.displayName && userDetails?.city && userDetails?.country && userDetails?.postalCode)
-  }), [userDetails]);
+  // Construire les données de progression
+  const userProgress = useMemo(() => buildUserProgress(userDetails), [userDetails]);
+  
+  // Calculer le statut dynamiquement basé sur la progression réelle
+  const calculatedStatus = useMemo(() => {
+    if (!userProgress) return 'nouveau';
+    return calculateUserStatus(userProgress);
+  }, [userProgress]);
 
   // Configuration des statuts avec leurs challenges
   const getStatusLevels = () => [
@@ -145,10 +141,10 @@ const ChallengesPage = () => {
     }
   ];
 
-  // Calculer le statut actuel de l'utilisateur
+  // Calculer le statut actuel de l'utilisateur basé sur la progression réelle
   const getCurrentStatusIndex = () => {
-    const statusMap = { 'bronze': 0, 'argent': 1, 'or': 2, 'diamant': 3 };
-    return statusMap[userProgress.currentStatus] || 0;
+    const statusMap = { 'nouveau': -1, 'bronze': 0, 'argent': 1, 'or': 2, 'diamant': 3 };
+    return statusMap[calculatedStatus] ?? -1;
   };
 
   // Calculer les points totaux basés sur les achievements actuels
@@ -179,7 +175,9 @@ const ChallengesPage = () => {
   // Déclencher l'animation de visibilité
   useEffect(() => {
     setIsVisible(true);
-    setActiveStatus(getCurrentStatusIndex());
+    // Si l'utilisateur est nouveau, afficher Bronze par défaut
+    const currentIndex = getCurrentStatusIndex();
+    setActiveStatus(currentIndex >= 0 ? currentIndex : 0);
   }, []);
 
   // Animer les barres de progression au montage
@@ -225,6 +223,56 @@ const ChallengesPage = () => {
 
   // Points calculés
   const totalPoints = calculateUserPoints();
+
+  // Obtenir la couleur et l'icône du statut
+  const getUserStatusInfo = (status) => {
+    const statusMap = {
+      nouveau: {
+        color: 'from-gray-300 to-gray-500',
+        textColor: 'text-gray-700',
+        bgColor: 'bg-gray-50',
+        borderColor: 'border-gray-200',
+        icon: <Users size={16} />,
+        emoji: ''  // Pas d'emoji pour nouveau
+      },
+      bronze: {
+        color: 'from-amber-400 to-amber-600',
+        textColor: 'text-amber-700',
+        bgColor: 'bg-amber-50',
+        borderColor: 'border-amber-200',
+        icon: <Award size={16} />,
+        emoji: '🥉'
+      },
+      argent: {
+        color: 'from-gray-300 to-gray-500',
+        textColor: 'text-gray-700',
+        bgColor: 'bg-gray-50',
+        borderColor: 'border-gray-200',
+        icon: <Award size={16} />,
+        emoji: '🥈'
+      },
+      or: {
+        color: 'from-yellow-400 to-yellow-600',
+        textColor: 'text-yellow-700',
+        bgColor: 'bg-yellow-50',
+        borderColor: 'border-yellow-200',
+        icon: <Trophy size={16} />,
+        emoji: '🥇'
+      },
+      diamant: {
+        color: 'from-blue-400 to-blue-600',
+        textColor: 'text-blue-700',
+        bgColor: 'bg-blue-50',
+        borderColor: 'border-blue-200',
+        icon: <Crown size={16} />,
+        emoji: '💎'
+      }
+    };
+    
+    return statusMap[status?.toLowerCase()] || statusMap.nouveau;
+  };
+
+  const statusInfo = getUserStatusInfo(calculatedStatus);
 
   return (
     <section className="py-20 bg-gradient-to-br from-green-50 to-white min-h-screen">
@@ -284,7 +332,7 @@ const ChallengesPage = () => {
                 <UserAvatar 
                   userId={userDetails?.firebase_uid || currentUser?.uid}
                   size={96}
-                  status={userDetails?.status || 'bronze'}
+                  status={calculatedStatus}
                   displayName={userDetails?.displayName || currentUser?.displayName}
                   customAvatarUrl={userDetails?.avatarUrl}
                   avatarSeed={userDetails?.avatarSeed}
@@ -292,9 +340,11 @@ const ChallengesPage = () => {
                   showBorder={true}
                 />
                 {/* Badge de statut avec animation */}
-                <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-2xl animate-bounce-in">
-                  {statusLevels[getCurrentStatusIndex()].icon}
-                </div>
+                {getCurrentStatusIndex() >= 0 && (
+                  <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-2xl animate-bounce-in">
+                    {statusLevels[getCurrentStatusIndex()].icon}
+                  </div>
+                )}
                 {/* Effet de brillance */}
                 <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-transparent via-white to-transparent opacity-0 group-hover:opacity-20 transform group-hover:rotate-180 transition-all duration-500 pointer-events-none"></div>
               </div>
@@ -305,8 +355,12 @@ const ChallengesPage = () => {
                   {userDetails?.displayName || currentUser?.displayName || 'Utilisateur'}
                 </h2>
                 <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r ${statusLevels[getCurrentStatusIndex()].gradient} text-white animate-pulse-slow`}>
-                    {statusLevels[getCurrentStatusIndex()].name}
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r ${
+                    calculatedStatus === 'nouveau' 
+                      ? 'from-gray-400 to-gray-600' 
+                      : getCurrentStatusIndex() >= 0 ? statusLevels[getCurrentStatusIndex()].gradient : 'from-gray-400 to-gray-600'
+                  } text-white animate-pulse-slow`}>
+                    {calculatedStatus === 'nouveau' ? 'Nouveau membre' : (getCurrentStatusIndex() >= 0 ? statusLevels[getCurrentStatusIndex()].name : 'Nouveau')}
                   </span>
                   <span className="text-gray-600">•</span>
                   <span className="text-gray-600 font-medium">{totalPoints} points</span>
@@ -343,17 +397,37 @@ const ChallengesPage = () => {
           <div className={`flex flex-wrap justify-center gap-4 mb-8 transition-all duration-700 delay-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
             {statusLevels.map((status, index) => {
               const isActive = activeStatus === index;
-              const isUnlocked = index <= getCurrentStatusIndex();
+              
+              // Un statut est débloqué (visible) si :
+              // - C'est le statut Bronze (index 0) : toujours visible
+              // - C'est le statut actuel de l'utilisateur
+              // - C'est un statut déjà atteint (inférieur au statut actuel)
+              // - C'est le statut suivant (pour voir la progression)
+              let isUnlocked = false;
+              const currentIndex = getCurrentStatusIndex();
+              
+              if (index === 0) {
+                // Bronze est toujours visible
+                isUnlocked = true;
+              } else if (currentIndex >= 0) {
+                // Si l'utilisateur a au moins le statut bronze
+                // On affiche tous les statuts jusqu'au suivant
+                isUnlocked = index <= currentIndex + 1;
+              } else {
+                // Si l'utilisateur est nouveau, on n'affiche que Bronze
+                isUnlocked = false;
+              }
+              
               const progress = calculateStatusProgress(status.challenges);
 
               return (
                 <button
                   key={status.name}
                   onClick={() => setActiveStatus(index)}
-                  disabled={!isUnlocked && index > getCurrentStatusIndex() + 1}
+                  disabled={!isUnlocked && index > 0}
                   className={`relative group transition-all duration-300 ${
                     isActive ? 'scale-110' : 'hover:scale-105'
-                  } ${!isUnlocked && index > getCurrentStatusIndex() + 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  } ${!isUnlocked && index > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   {/* Carte du statut avec effet de hover */}
@@ -415,7 +489,7 @@ const ChallengesPage = () => {
                     </div>
 
                     {/* Verrou pour les statuts non débloqués */}
-                    {!isUnlocked && index > getCurrentStatusIndex() + 1 && (
+                    {!isUnlocked && index > 0 && (
                       <div className="absolute inset-0 bg-white bg-opacity-90 rounded-xl flex items-center justify-center">
                         <Lock className="w-8 h-8 text-gray-400" />
                       </div>
@@ -425,6 +499,13 @@ const ChallengesPage = () => {
                   {/* Indicateur actif avec animation */}
                   {isActive && (
                     <div className={`absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-r ${status.gradient} rounded-full animate-pulse`}></div>
+                  )}
+                  
+                  {/* Badge "Actuel" si c'est le statut de l'utilisateur */}
+                  {currentIndex >= 0 && currentIndex === index && (
+                    <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-bold animate-bounce-in">
+                      Actuel
+                    </div>
                   )}
                 </button>
               );

@@ -1,7 +1,8 @@
 // src/components/profile/ProfileSidebar.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { calculateUserStatus, buildUserProgress } from '../../utils/statusCalculator';
 import { 
   User, 
   Settings, 
@@ -37,6 +38,13 @@ const ProfileSidebar = ({ currentUser, onLogout, loading }) => {
   useEffect(() => {
     setIsVisible(true);
   }, []);
+
+  // Calculer le statut dynamiquement
+  const userProgress = useMemo(() => buildUserProgress(userDetails), [userDetails]);
+  const calculatedStatus = useMemo(() => {
+    if (!userProgress) return 'nouveau';
+    return calculateUserStatus(userProgress);
+  }, [userProgress]);
 
   // Navigation principale du profil avec groupes logiques
   const profileNavGroups = [
@@ -131,6 +139,13 @@ const ProfileSidebar = ({ currentUser, onLogout, loading }) => {
   // Obtenir le statut utilisateur avec style approprié
   const getUserStatusInfo = (status) => {
     const statusMap = {
+      nouveau: {
+        color: 'from-gray-400 to-gray-600',
+        bgColor: 'bg-gray-50',
+        borderColor: 'border-gray-200',
+        icon: <Award size={16} />,
+        emoji: ''  // Pas d'emoji pour nouveau
+      },
       bronze: {
         color: 'from-amber-400 to-amber-600',
         bgColor: 'bg-amber-50',
@@ -161,7 +176,7 @@ const ProfileSidebar = ({ currentUser, onLogout, loading }) => {
       }
     };
     
-    return statusMap[status?.toLowerCase()] || statusMap.bronze;
+    return statusMap[status?.toLowerCase()] || statusMap.nouveau;
   };
 
   const getColorClasses = (color) => {
@@ -176,7 +191,7 @@ const ProfileSidebar = ({ currentUser, onLogout, loading }) => {
     return colors[color] || colors.gray;
   };
 
-  const statusInfo = getUserStatusInfo(userDetails?.status);
+  const statusInfo = getUserStatusInfo(calculatedStatus);
 
   return (
     <div className={`bg-white rounded-2xl shadow-xl border border-green-100 overflow-hidden h-fit sticky top-40 transition-all duration-700 ${
@@ -197,7 +212,7 @@ const ProfileSidebar = ({ currentUser, onLogout, loading }) => {
             <UserAvatar 
               userId={userDetails?.firebase_uid || currentUser?.uid}
               size={80}
-              status={userDetails?.status || 'bronze'}
+              status={calculatedStatus}
               displayName={currentUser?.displayName || currentUser?.email}
               customAvatarUrl={userDetails?.avatarUrl}
               avatarSeed={userDetails?.avatarSeed}
@@ -216,9 +231,9 @@ const ProfileSidebar = ({ currentUser, onLogout, loading }) => {
           
           {/* Badge de statut avec style moderne */}
           <div className={`inline-flex items-center px-3 py-1.5 rounded-full ${statusInfo.bgColor} ${statusInfo.borderColor} border`}>
-            <span className="mr-1.5 text-base">{statusInfo.emoji}</span>
+            {statusInfo.emoji && <span className="mr-1.5 text-base">{statusInfo.emoji}</span>}
             <span className="text-xs font-semibold text-gray-700 capitalize">
-              {userDetails?.status || 'Bronze'}
+              {calculatedStatus === 'nouveau' ? 'Nouveau' : calculatedStatus}
             </span>
           </div>
         </div>

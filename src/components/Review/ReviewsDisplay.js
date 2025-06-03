@@ -365,8 +365,9 @@ const ReviewsDisplay = ({
                   )}
 
                   {/* Commentaire */}
-                  <p className="text-gray-700 leading-relaxed">{review.comment}</p>
-
+              {review.review_source === 'ai' ? (
+                  <p className="bg-gradient-to-br from-red-100 flex  text-gray-700  leading-relaxed font-small"><span className="pl-2">{review.comment}</span></p>
+              ):(<p className="bg-gradient-to-br from-green-100 flex  text-gray-700  leading-relaxed font-small"><span className="pl-2">{review.comment}</span></p>)}
                   {/* Informations d'achat */}
                   {(review.purchase_date || review.purchase_price || review.store_name) && (
                     <div className="mt-6 pt-6 border-t border-gray-100">
