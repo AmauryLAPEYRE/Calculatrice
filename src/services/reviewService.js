@@ -84,7 +84,8 @@ export const getProductReviews = async (productCode, limit = 10, offset = 0) => 
     // Récupérer les critères pour afficher les noms
     const { data: criterias, error: criteriasError } = await supabase
       .from('review_criterias')
-      .select('*');
+      .select('*')
+      .order('weight', { ascending: false });
       
     if (criteriasError) throw criteriasError;
     
@@ -549,7 +550,8 @@ export const getUserReviews = async (userId, limit = 10, offset = 0) => {
     // Récupérer les critères pour afficher les noms
     const { data: criterias, error: criteriasError } = await supabase
       .from('review_criterias')
-      .select('*');
+      .select('*')
+      .order('weight', { ascending: false });
       
     if (criteriasError) throw criteriasError;
     
@@ -848,5 +850,255 @@ export const getProductRecentPrices = async (productCode, limit = 10) => {
   } catch (error) {
     console.error("Erreur lors de la récupération de l'historique des prix:", error.message);
     return { success: false, error: error.message };
+  }
+};
+
+// Service pour récupérer les critères d'évaluation spécifiques à un produit
+// avec fallback sur les critères par défaut
+
+/**
+ * Récupère les critères d'évaluation pour un produit donné
+ * @param {string} productCode - Code du produit (code-barres)
+ * @returns {Object} - Résultat avec success, data, et informations supplémentaires
+ */
+export const getProductReviewCriterias = async (productCode) => {
+  try {
+    if (!productCode) {
+      throw new Error("Le code produit est requis");
+    }
+
+    // 1. Récupérer le produit et sa category_master
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .select('code, product_name, category_master')
+      .eq('code', productCode)
+      .single();
+
+    if (productError) {
+      throw new Error(`Erreur lors de la récupération du produit: ${productError.message}`);
+    }
+
+    if (!product) {
+      throw new Error(`Produit avec le code ${productCode} non trouvé`);
+    }
+
+    let categoryMaster = product.category_master;
+    let usedFallback = false;
+
+    // 2. Si pas de category_master définie, utiliser 'default'
+    if (!categoryMaster || categoryMaster.trim() === '') {
+      categoryMaster = 'default';
+      usedFallback = true;
+    }
+
+    // 3. Récupérer les critères pour cette catégorie
+    const { data: criterias, error: criteriasError } = await supabase
+      .from('review_criterias')
+      .select('*')
+      .eq('category_master', categoryMaster)
+      .order('weight', { ascending: false });
+
+    if (criteriasError) {
+      throw new Error(`Erreur lors de la récupération des critères: ${criteriasError.message}`);
+    }
+
+    // 4. Si aucun critère trouvé pour cette catégorie, utiliser les critères par défaut
+    if (!criterias || criterias.length === 0) {
+      const { data: defaultCriterias, error: defaultError } = await supabase
+        .from('review_criterias')
+        .select('*')
+        .eq('category_master', 'default')
+        .order('weight', { ascending: false });
+
+      if (defaultError) {
+        throw new Error(`Erreur lors de la récupération des critères par défaut: ${defaultError.message}`);
+      }
+
+      return {
+        success: true,
+        data: defaultCriterias || [],
+        productInfo: {
+          code: product.code,
+          name: product.product_name,
+          originalCategory: product.category_master,
+          usedCategory: 'default',
+          usedFallback: true,
+          fallbackReason: 'no_criterias_found'
+        }
+      };
+    }
+
+    // 5. Retourner les critères trouvés
+    return {
+      success: true,
+      data: criterias,
+      productInfo: {
+        code: product.code,
+        name: product.product_name,
+        originalCategory: product.category_master,
+        usedCategory: categoryMaster,
+        usedFallback: usedFallback,
+        fallbackReason: usedFallback ? 'no_category_defined' : null
+      }
+    };
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération des critères du produit:", error.message);
+    return { 
+      success: false, 
+      error: error.message,
+      data: [],
+      productInfo: null
+    };
+  }
+};
+
+/**
+ * Version simplifiée qui retourne seulement les critères (pour compatibilité)
+ * @param {string} productCode - Code du produit
+ * @returns {Object} - Résultat avec success et data uniquement
+ */
+export const getProductCriteriasSimple = async (productCode) => {
+  const result = await getProductReviewCriterias(productCode);
+  
+  return {
+    success: result.success,
+    data: result.data,
+    error: result.error
+  };
+};
+
+/**
+ * Récupère les informations de catégorie d'un produit
+ * @param {string} productCode - Code du produit
+ * @returns {Object} - Informations sur la catégorie du produit
+ */
+export const getProductCategoryInfo = async (productCode) => {
+  try {
+    if (!productCode) {
+      throw new Error("Le code produit est requis");
+    }
+
+    // Récupérer le produit avec les informations de catégorie
+    const { data: result, error } = await supabase
+      .from('products_with_category_master') // Vue créée dans le SQL
+      .select('*')
+      .eq('code', productCode)
+      .single();
+
+    if (error) {
+      throw new Error(`Erreur lors de la récupération des informations de catégorie: ${error.message}`);
+    }
+
+    if (!result) {
+      throw new Error(`Produit avec le code ${productCode} non trouvé`);
+    }
+
+    return {
+      success: true,
+      data: {
+        productCode: result.code,
+        productName: result.product_name,
+        categoryMaster: result.category_master,
+        categoryDisplayName: result.category_display_name,
+        categoryDescription: result.category_description,
+        hasCategory: !!result.category_master
+      }
+    };
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération des informations de catégorie:", error.message);
+    return { 
+      success: false, 
+      error: error.message,
+      data: null
+    };
+  }
+};
+
+/**
+ * Assigne une catégorie maître à un produit
+ * @param {string} productCode - Code du produit
+ * @param {string} categoryMaster - Code de la catégorie maître
+ * @returns {Object} - Résultat de l'opération
+ */
+export const assignProductCategory = async (productCode, categoryMaster) => {
+  try {
+    if (!productCode || !categoryMaster) {
+      throw new Error("Le code produit et la catégorie sont requis");
+    }
+
+    // Vérifier que la catégorie existe
+    const { data: categoryExists, error: categoryError } = await supabase
+      .from('category_masters')
+      .select('code, display_name')
+      .eq('code', categoryMaster)
+      .single();
+
+    if (categoryError || !categoryExists) {
+      throw new Error(`Catégorie maître '${categoryMaster}' non trouvée`);
+    }
+
+    // Mettre à jour le produit
+    const { data, error } = await supabase
+      .from('products')
+      .update({ category_master: categoryMaster })
+      .eq('code', productCode)
+      .select('code, product_name, category_master');
+
+    if (error) {
+      throw new Error(`Erreur lors de l'assignation de catégorie: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+      throw new Error(`Produit avec le code ${productCode} non trouvé`);
+    }
+
+    return {
+      success: true,
+      data: {
+        productCode: data[0].code,
+        productName: data[0].product_name,
+        assignedCategory: categoryMaster,
+        categoryDisplayName: categoryExists.display_name
+      }
+    };
+
+  } catch (error) {
+    console.error("Erreur lors de l'assignation de catégorie:", error.message);
+    return { 
+      success: false, 
+      error: error.message 
+    };
+  }
+};
+
+/**
+ * Récupère toutes les catégories maîtres disponibles
+ * @returns {Object} - Liste des catégories disponibles
+ */
+export const getAvailableCategoryMasters = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('category_masters')
+      .select('*')
+      .order('code');
+
+    if (error) {
+      throw new Error(`Erreur lors de la récupération des catégories: ${error.message}`);
+    }
+
+    return {
+      success: true,
+      data: data || []
+    };
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération des catégories:", error.message);
+    return { 
+      success: false, 
+      error: error.message,
+      data: []
+    };
   }
 };

@@ -1,4 +1,4 @@
-// src/components/ProductDetail.js
+// src/components/ProductDetail.js - Version modifiée
 import React, { useState, useEffect, useRef } from 'react';
 import PriceHistory from './Review/PriceHistory';
 import { 
@@ -19,7 +19,8 @@ import {
   BarChart3,
   Bot,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Tag // Nouveau : icône pour les critères
 } from 'lucide-react';
 import PageNutri from './PageNutri';
 import PageEnvir from './PageEnvir';
@@ -29,7 +30,12 @@ import FavoriteButton from './FavoriteButton';
 import { findProductInDatabase, saveProductToDatabase } from '../services/productDatabaseService';
 import { getProductDetails } from '../services/productService';
 
-// Dans ProductDetail.js, remplacez les imports par :
+// Imports pour les nouveaux services de critères
+import { 
+  getProductCriteriasSimple, 
+  getProductCategoryInfo,
+  getAvailableCategoryMasters 
+} from '../services/reviewService';
 
 import { autoGenerateReviewIfNeeded } from '../services/aiReviewService';
 import { AIReviewGenerationStatus } from '../components/AIReviewComponents';
@@ -50,6 +56,13 @@ const ProductDetail = ({ product }) => {
   const [productStats, setProductStats] = useState(null);
   const [hasTriedAIGeneration, setHasTriedAIGeneration] = useState(false);
   const [aiGenerationTriggered, setAiGenerationTriggered] = useState(false);
+  
+  // NOUVEAUX ÉTATS POUR LES CRITÈRES SPÉCIFIQUES
+  const [productCriterias, setProductCriterias] = useState([]);
+  const [criteriasLoading, setCriteriasLoading] = useState(false);
+  const [criteriasError, setCriteriasError] = useState(null);
+  const [categoryInfo, setCategoryInfo] = useState(null);
+  const [showCriteriaInfo, setShowCriteriaInfo] = useState(false);
   
   const menuRef = useRef(null);
   const { currentUser, userDetails } = useAuth();
@@ -89,6 +102,53 @@ const ProductDetail = ({ product }) => {
     
     syncProductWithDatabase();
   }, [product]);
+
+  // NOUVEAU : Récupération des critères spécifiques au produit
+  useEffect(() => {
+    const fetchProductCriterias = async () => {
+      if (!product || !product.code) {
+        setProductCriterias([]);
+        return;
+      }
+      
+      setCriteriasLoading(true);
+      setCriteriasError(null);
+      
+      try {
+        console.log('🎯 Récupération des critères pour le produit:', product.code);
+        
+        // Récupérer les critères spécifiques au produit
+        const criteriasResult = await getProductCriteriasSimple(product.code);
+        
+        if (criteriasResult.success) {
+          setProductCriterias(criteriasResult.data || []);
+          console.log('✅ Critères récupérés:', criteriasResult.data);
+          
+          // Récupérer aussi les informations de catégorie
+          const categoryResult = await getProductCategoryInfo(product.code);
+          if (categoryResult.success) {
+            setCategoryInfo(categoryResult.data);
+            console.log('📁 Informations de catégorie:', categoryResult.data);
+          }
+        } else {
+          setCriteriasError(criteriasResult.error);
+          console.error('❌ Erreur récupération critères:', criteriasResult.error);
+          
+          // En cas d'erreur, essayer de récupérer les critères par défaut
+          // (cette logique pourrait être dans le service, mais on ajoute une sécurité)
+          setProductCriterias([]);
+        }
+      } catch (error) {
+        console.error('💥 Exception lors de la récupération des critères:', error);
+        setCriteriasError(error.message);
+        setProductCriterias([]);
+      } finally {
+        setCriteriasLoading(false);
+      }
+    };
+    
+    fetchProductCriterias();
+  }, [product?.code]); // Dépendance sur le code produit uniquement
 
   // Récupération des statistiques du produit depuis la base de données
   useEffect(() => {
@@ -244,6 +304,67 @@ const ProductDetail = ({ product }) => {
   const languageButtonStyle = (activeLanguage, currentLanguage) => 
     `px-2 py-1 rounded text-xs ${activeLanguage === currentLanguage ? 'bg-green-500 text-white' : 'bg-gray-200'}`;
 
+  // NOUVEAU : Fonction pour afficher les critères de notation
+  const renderCriteriasInfo = () => {
+    if (!productCriterias || productCriterias.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-2">
+            <Tag size={18} className="text-blue-600" />
+            <span className="font-semibold text-blue-800">
+              Critères d'évaluation
+              {categoryInfo?.categoryDisplayName && (
+                <span className="text-sm font-normal text-blue-600 ml-2">
+                  ({categoryInfo.categoryDisplayName})
+                </span>
+              )}
+            </span>
+          </div>
+          <button
+            onClick={() => setShowCriteriaInfo(!showCriteriaInfo)}
+            className="text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            <ChevronDown 
+              size={16} 
+              className={`transform transition-transform ${showCriteriaInfo ? 'rotate-180' : ''}`} 
+            />
+          </button>
+        </div>
+        
+        {showCriteriaInfo && (
+          <div className="space-y-2">
+            {productCriterias.map((criteria, index) => (
+              <div key={criteria.id} className="flex items-center justify-between py-2 px-3 bg-white rounded-lg">
+                <div className="flex-1">
+                  <span className="font-medium text-gray-800">{criteria.display_name}</span>
+                  {criteria.description && (
+                    <p className="text-sm text-gray-600 mt-1">{criteria.description}</p>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-500">Coef.</span>
+                  <span className="font-bold text-blue-600">{criteria.weight}</span>
+                </div>
+              </div>
+            ))}
+            {!categoryInfo?.hasCategory && (
+              <div className="mt-2 p-2 bg-amber-100 rounded-lg">
+                <p className="text-xs text-amber-800">
+                  💡 Ce produit utilise les critères par défaut. 
+                  Une catégorisation pourrait permettre des critères plus spécifiques.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className={`bg-white rounded-3xl shadow-2xl overflow-hidden transition-all duration-700 transform ${
       isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
@@ -376,6 +497,15 @@ const ProductDetail = ({ product }) => {
                         </span>
                       </div>
                     )}
+                    {/* NOUVEAU : Indicateur de critères personnalisés */}
+                    {categoryInfo?.hasCategory && (
+                      <div className="flex items-center justify-center sm:justify-start space-x-2 text-yellow-200">
+                        <Tag size={14} className="sm:w-4 sm:h-4" />
+                        <span className="text-xs sm:text-sm">
+                          Critères spécialisés
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -390,39 +520,39 @@ const ProductDetail = ({ product }) => {
                 </button>
               </div>
 
-              {/* Mini stats en dessous - RESPONSIVE */}
-              {(displayStats.taste_rating > 0 || displayStats.quantity_rating > 0 || displayStats.price_rating > 0) && (
-                <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-white/20">
-                  {displayStats.taste_rating > 0 && (
-                    <div className="text-center">
-                      <p className="text-green-100 text-xs sm:text-sm mb-1">Goût</p>
-                      <div className="flex items-center justify-center">
-                        <Star size={14} className="sm:w-4 sm:h-4 text-yellow-400 fill-yellow-400 mr-1" />
-                        <span className="text-white font-bold text-sm sm:text-base">{displayStats.taste_rating.toFixed(2)}</span>
+              {/* NOUVEAU : Affichage des critères spécialisés dans la section notation */}
+              {productCriterias.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-white/20">
+                  {productCriterias.slice(0, 3).map((criteria, index) => {
+                    // Mapper les critères aux ratings correspondants
+                    let ratingValue = 0;
+                    if (criteria.name === 'taste' || criteria.name === 'critere1') ratingValue = displayStats.taste_rating;
+                    else if (criteria.name === 'quantity' || criteria.name === 'critere2') ratingValue = displayStats.quantity_rating;
+                    else if (criteria.name === 'price' ||  criteria.name === 'critere3') ratingValue = displayStats.price_rating;
+                    
+                    return (
+                      <div key={criteria.id} className="text-center">
+                        <p className="text-green-100 text-xs sm:text-sm mb-1 truncate">
+                          {criteria.display_name}
+                        </p>
+                        <div className="flex items-center justify-center">
+                          <Star size={14} className="sm:w-4 sm:h-4 text-yellow-400 fill-yellow-400 mr-1" />
+                          <span className="text-white font-bold text-sm sm:text-base">
+                            {ratingValue > 0 ? ratingValue.toFixed(2) : '0.0'}
+                          </span>
+                          <span className="text-green-100 text-xs ml-1">
+                            (×{criteria.weight})
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {displayStats.quantity_rating > 0 && (
-                    <div className="text-center">
-                      <p className="text-green-100 text-xs sm:text-sm mb-1">Quantité</p>
-                      <div className="flex items-center justify-center">
-                        <Star size={14} className="sm:w-4 sm:h-4 text-yellow-400 fill-yellow-400 mr-1" />
-                        <span className="text-white font-bold text-sm sm:text-base">{displayStats.quantity_rating.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  )}
-                  {displayStats.price_rating > 0 && (
-                    <div className="text-center">
-                      <p className="text-green-100 text-xs sm:text-sm mb-1">Prix</p>
-                      <div className="flex items-center justify-center">
-                        <Star size={14} className="sm:w-4 sm:h-4 text-yellow-400 fill-yellow-400 mr-1" />
-                        <span className="text-white font-bold text-sm sm:text-base">{displayStats.price_rating.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
               )}
             </div>
+
+            {/* NOUVEAU : Section d'information sur les critères */}
+            {renderCriteriasInfo()}
 
             {/* Historique des prix - RESPONSIVE */}
             {product.average_price > 0 && (
@@ -435,16 +565,24 @@ const ProductDetail = ({ product }) => {
             )}
 
             {/* Prix moyen et favoris - RESPONSIVE */}
-            <div className="flex flex-wrap items-center gap-3 sm:gap-6 mt-3 sm:mt-4">
-              {displayStats.total_favorites > 0 && (
-                <div className="flex items-center space-x-2 bg-pink-50 px-3 py-2 sm:px-4 rounded-full">
-                  <Heart size={16} className="sm:w-5 sm:h-5 text-pink-500 fill-pink-500" />
-                  <span className="text-pink-700 font-medium text-sm sm:text-base">
-                    {displayStats.total_favorites} favoris
-                  </span>
-                </div>
-              )}
-            </div>
+
+
+            {/* NOUVEAU : Indicateur de chargement ou d'erreur des critères */}
+            {criteriasLoading && (
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                <span className="text-sm text-gray-600">Chargement des critères...</span>
+              </div>
+            )}
+            
+            {criteriasError && (
+              <div className="mt-3 p-3 bg-red-50 rounded-lg flex items-center space-x-2">
+                <AlertCircle size={16} className="text-red-500" />
+                <span className="text-sm text-red-600">
+                  Erreur lors du chargement des critères: {criteriasError}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -488,7 +626,14 @@ const ProductDetail = ({ product }) => {
       
       {/* Contenu des onglets - RESPONSIVE */}
       <div className="p-4 sm:p-6 lg:p-8">
-        {activeTab === 'avis' && <PageAvisEnhanced product={product} productStats={displayStats} />}
+        {activeTab === 'avis' && (
+          <PageAvisEnhanced 
+            product={product} 
+            productStats={displayStats}
+            productCriterias={productCriterias} // NOUVEAU : Passer les critères
+            categoryInfo={categoryInfo} // NOUVEAU : Passer les infos de catégorie
+          />
+        )}
         {activeTab === 'nutrition' && <PageNutri product={product}           
           renderIngredients={renderIngredients}
           ingredientsLanguage={ingredientsLanguage}

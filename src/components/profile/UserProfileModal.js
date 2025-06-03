@@ -185,6 +185,8 @@ const UserProfileModal = ({ userId, userName, isOpen, onClose }) => {
         style={{ opacity: animationPhase >= 1 ? 1 : 0 }}
       />
       
+
+      
       {/* Modal */}
       <div className="flex min-h-screen items-center justify-center p-4">
         <div 

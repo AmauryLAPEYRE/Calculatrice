@@ -34,6 +34,38 @@ import { useAuth } from '../contexts/AuthContext';
 import fydoLogo from '../assets/images/Fydo-logo.png';
 import UserAvatar from './profile/UserAvatar';
 
+// Fonction pour obtenir les classes du badge selon son type
+const getBadgeClasses = (badgeText) => {
+  if (!badgeText) return '';
+  
+  switch (badgeText) {
+    case 'NEW':
+      return 'bg-red-500 text-white animate-pulse shadow-sm';
+    case 'Essential':
+      return 'bg-green-100 text-green-700 border border-green-200';
+    case 'Premium':
+      return 'bg-amber-100 text-amber-700 border border-amber-200';
+    case 'Gratuit':
+      return 'bg-gray-100 text-gray-700 border border-gray-200';
+    default:
+      return 'bg-gray-100 text-gray-700 border border-gray-200';
+  }
+};
+
+// Fonction pour obtenir l'icône du badge
+const getBadgeIcon = (badgeText) => {
+  switch (badgeText) {
+    case 'Essential':
+      return <Zap size={10} className="mr-0.5" />;
+    case 'Premium':
+      return <Crown size={10} className="mr-0.5" />;
+    case 'Gratuit':
+      return <Heart size={10} className="mr-0.5" />;
+    default:
+      return null;
+  }
+};
+
 const Header = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileProfileOpen, setMobileProfileOpen] = useState(false);
@@ -283,7 +315,9 @@ const Header = () => {
                       userId={userDetails?.firebase_uid || currentUser?.uid}
                       size={28}
                       status={userDetails?.status || 'bronze'}
-                      displayName={currentUser?.displayName}
+                      displayName={currentUser?.displayName || currentUser?.email}
+                      customAvatarUrl={userDetails?.avatarUrl}
+                      avatarSeed={userDetails?.avatarSeed}
                       className="shadow-sm"
                       showBorder={true}
                     />
@@ -520,6 +554,8 @@ const Header = () => {
                       size={40}
                       status={userDetails?.status || 'bronze'}
                       displayName={currentUser?.displayName}
+                      customAvatarUrl={userDetails?.avatarUrl}
+                      avatarSeed={userDetails?.avatarSeed}
                       className="mr-3 shadow-md group-hover:shadow-lg transition-all duration-300"
                       showBorder={true}
                     />
@@ -549,10 +585,11 @@ const Header = () => {
                       </span>
                       
                       {/* Badge Premium si applicable */}
-                      {subscriptionPlan?.name && subscriptionPlan.name !== 'Gratuit' && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md">
-                          <Sparkles size={10} className="mr-0.5 animate-pulse" />
-                          {subscriptionPlan.name}
+                      {(subscriptionPlan?.name || userDetails?.subscription_name) && 
+                       (subscriptionPlan?.name || userDetails?.subscription_name) !== 'Gratuit' && (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getBadgeClasses(subscriptionPlan?.name || userDetails?.subscription_name)}`}>
+                          {getBadgeIcon(subscriptionPlan?.name || userDetails?.subscription_name)}
+                          {subscriptionPlan?.name || userDetails?.subscription_name}
                         </span>
                       )}
                     </div>
@@ -574,7 +611,16 @@ const Header = () => {
                     </div>
                     
                     <div className="py-2">
-                      <DropdownLink to="/profile" icon={<User size={18} />} badge={subscriptionPlan?.name !== 'Gratuit' ? 'PRO' : null} onClick={handleDropdownClick}>
+                      <DropdownLink 
+                        to="/profile" 
+                        icon={<User size={18} />} 
+                        badge={
+                          (subscriptionPlan?.name || userDetails?.subscription_name) !== 'Gratuit' 
+                            ? (subscriptionPlan?.name || userDetails?.subscription_name) 
+                            : null
+                        } 
+                        onClick={handleDropdownClick}
+                      >
                         Mon profil
                       </DropdownLink>
                       
@@ -723,7 +769,7 @@ const Header = () => {
   );
 };
 
-// Composant pour les liens du menu déroulant avec badges et animations
+// Composant pour les liens du menu déroulant avec badges et animations...
 const DropdownLink = ({ to, children, icon, special, count, badge, onClick }) => {
   const location = useLocation();
   const isActive = location.pathname === to;
@@ -753,13 +799,8 @@ const DropdownLink = ({ to, children, icon, special, count, badge, onClick }) =>
           </span>
         )}
         {badge && (
-          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-            badge === 'NEW' 
-              ? 'bg-red-500 text-white animate-pulse' 
-              : badge === 'PRO'
-                ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white'
-                : 'bg-gray-200 text-gray-700'
-          }`}>
+          <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full font-medium ${getBadgeClasses(badge)}`}>
+            {getBadgeIcon(badge)}
             {badge}
           </span>
         )}

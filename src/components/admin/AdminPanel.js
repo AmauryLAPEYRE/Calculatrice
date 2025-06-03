@@ -1,6 +1,6 @@
-// src/components/admin/AdminPanel.js - Modifié pour inclure l'onglet des challenges
+// src/components/admin/AdminPanel.js - Modifié pour inclure l'onglet des catégories
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link ,useLocation} from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../supabaseClient';
 import { 
@@ -20,7 +20,9 @@ import {
   Clock,
   Info,
   DollarSign,
-  Trophy // Ajouté pour l'icône des challenges
+  Trophy, // Icône des challenges
+  Tag,     // Icône des catégories
+  Settings // Ajouté pour les statistiques des catégories
 } from 'lucide-react';
 import ProfileLayout from '../profile/ProfileLayout';
 import { getReviewStats } from '../../services/adminService';
@@ -29,7 +31,8 @@ import { formatDate } from '../../utils/formatters';
 const AdminPanel = () => {
   const { currentUser, userDetails } = useAuth();
   const navigate = useNavigate();
-  
+   const location = useLocation();
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -45,8 +48,23 @@ const AdminPanel = () => {
   const [successMessage, setSuccessMessage] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [reviewStats, setReviewStats] = useState({ pending: 0 });
-  const [challengeStats, setChallengeStats] = useState({ total: 0, active: 0 }); // Ajout des stats pour les challenges
+  const [challengeStats, setChallengeStats] = useState({ total: 0, active: 0 });
   
+  // NOUVEAU : Statistiques des catégories
+  const [categoryStats, setCategoryStats] = useState({ 
+    totalCategories: 0, 
+    totalCriterias: 0,
+    categoriesWithoutCriterias: 0
+  });
+   // NOUVEAU : Fonction pour déterminer l'onglet actif basé sur l'URL
+  const getActiveTab = () => {
+    const path = location.pathname;
+    if (path === '/admin') return 'users';
+    if (path === '/admin/pending-reviews') return 'reviews';
+    if (path === '/admin/challenges') return 'challenges';
+    if (path === '/admin/categories') return 'categories';
+    return 'users';
+  }; 
   // Statistiques d'abonnements
   const [subscriptionStats, setSubscriptionStats] = useState({
     totalActive: 0,
@@ -162,6 +180,43 @@ const AdminPanel = () => {
         setChallengeStats({
           total: totalChallengesCount || 0,
           active: activeChallengesCount || 0
+        });
+        
+        // NOUVEAU : Récupérer les statistiques des catégories
+        const { count: totalCategoriesCount, error: categoriesCountError } = await supabase
+          .from('category_masters')
+          .select('*', { count: 'exact', head: true });
+          
+        if (categoriesCountError) throw categoriesCountError;
+        
+        const { count: totalCriteriasCount, error: criteriasCountError } = await supabase
+          .from('review_criterias')
+          .select('*', { count: 'exact', head: true });
+          
+        if (criteriasCountError) throw criteriasCountError;
+        
+        // Compter les catégories sans critères
+        const { data: categoriesData, error: categoriesDataError } = await supabase
+          .from('category_masters')
+          .select('code');
+          
+        if (categoriesDataError) throw categoriesDataError;
+        
+        const { data: criteriasData, error: criteriasDataError } = await supabase
+          .from('review_criterias')
+          .select('category_master');
+          
+        if (criteriasDataError) throw criteriasDataError;
+        
+        const categoriesWithCriterias = new Set(criteriasData.map(c => c.category_master));
+        const categoriesWithoutCriterias = categoriesData.filter(cat => 
+          !categoriesWithCriterias.has(cat.code)
+        ).length;
+        
+        setCategoryStats({
+          totalCategories: totalCategoriesCount || 0,
+          totalCriterias: totalCriteriasCount || 0,
+          categoriesWithoutCriterias: categoriesWithoutCriterias
         });
         
         // Calculer les statistiques d'abonnements
@@ -548,14 +603,25 @@ const AdminPanel = () => {
         </div>
       ) : (
         <div>
-          {/* Onglets de navigation */}
-          <div className="flex items-center space-x-4 mb-6 border-b border-gray-200">
-            <div className="px-4 py-2 text-green-600 border-b-2 border-green-600">
+          {/* Onglets de navigation - CORRIGÉ */}
+          <div className="flex items-center space-x-4 mb-6 border-b border-gray-200 overflow-x-auto">
+            <div className={`px-4 py-2 whitespace-nowrap ${
+              getActiveTab() === 'users' 
+                ? 'text-green-600 border-b-2 border-green-600' 
+                : 'text-gray-600 hover:text-green-600'
+            }`}>
               <Users className="inline-block mr-2" size={18} />
               Utilisateurs
             </div>
             
-            <Link to="/admin/pending-reviews" className="px-4 py-2 text-gray-600 hover:text-green-600 flex items-center">
+            <Link 
+              to="/admin/pending-reviews" 
+              className={`px-4 py-2 whitespace-nowrap flex items-center ${
+                getActiveTab() === 'reviews'
+                  ? 'text-green-600 border-b-2 border-green-600'
+                  : 'text-gray-600 hover:text-green-600'
+              }`}
+            >
               <MessageSquare className="inline-block mr-2" size={18} />
               Avis à valider
               {reviewStats.pending > 0 && (
@@ -565,8 +631,14 @@ const AdminPanel = () => {
               )}
             </Link>
             
-            {/* Nouvel onglet pour les challenges */}
-            <Link to="/admin/challenges" className="px-4 py-2 text-gray-600 hover:text-green-600 flex items-center">
+            <Link 
+              to="/admin/challenges" 
+              className={`px-4 py-2 whitespace-nowrap flex items-center ${
+                getActiveTab() === 'challenges'
+                  ? 'text-green-600 border-b-2 border-green-600'
+                  : 'text-gray-600 hover:text-green-600'
+              }`}
+            >
               <Trophy className="inline-block mr-2" size={18} />
               Challenges
               {challengeStats.active > 0 && (
@@ -575,10 +647,27 @@ const AdminPanel = () => {
                 </span>
               )}
             </Link>
+            
+            <Link 
+              to="/admin/categories" 
+              className={`px-4 py-2 whitespace-nowrap flex items-center ${
+                getActiveTab() === 'categories'
+                  ? 'text-green-600 border-b-2 border-green-600'
+                  : 'text-gray-600 hover:text-green-600'
+              }`}
+            >
+              <Tag className="inline-block mr-2" size={18} />
+              Catégories
+              {categoryStats.categoriesWithoutCriterias > 0 && (
+                <span className="ml-2 flex items-center justify-center w-6 h-6 bg-orange-500 text-white rounded-full text-xs font-bold">
+                  {categoryStats.categoriesWithoutCriterias}
+                </span>
+              )}
+            </Link>
           </div>
           
-          {/* Tableau de bord - Statistiques */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+          {/* Tableau de bord - Statistiques MODIFIÉ POUR 6 CARTES */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
             {/* Statistiques des utilisateurs */}
             <div className="bg-white p-4 rounded-lg shadow-sm flex items-center">
               <div className="p-3 rounded-full bg-blue-100 mr-4">
@@ -647,7 +736,7 @@ const AdminPanel = () => {
               </div>
             </div>
             
-            {/* Nouvelles statistiques des challenges */}
+            {/* Statistiques des challenges */}
             <div className="bg-white p-4 rounded-lg shadow-sm flex items-center">
               <div className="p-3 rounded-full bg-amber-100 mr-4">
                 <Trophy className="h-6 w-6 text-amber-600" />
@@ -664,6 +753,32 @@ const AdminPanel = () => {
                     <p className="text-xs text-gray-500">Inactifs</p>
                   </div>
                 </div>
+              </div>
+            </div>
+            
+            {/* NOUVELLE : Statistiques des catégories */}
+            <div className="bg-white p-4 rounded-lg shadow-sm flex items-center">
+              <div className="p-3 rounded-full bg-blue-100 mr-4">
+                <Tag className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Catégories</p>
+                <div className="flex space-x-4">
+                  <div>
+                    <p className="text-lg font-bold">{categoryStats.totalCategories}</p>
+                    <p className="text-xs text-gray-500">Total</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold">{categoryStats.totalCriterias}</p>
+                    <p className="text-xs text-gray-500">Critères</p>
+                  </div>
+                </div>
+                {categoryStats.categoriesWithoutCriterias > 0 && (
+                  <p className="text-xs text-orange-600 mt-1 flex items-center">
+                    <Settings className="h-3 w-3 mr-1" />
+                    {categoryStats.categoriesWithoutCriterias} sans critères
+                  </p>
+                )}
               </div>
             </div>
           </div>

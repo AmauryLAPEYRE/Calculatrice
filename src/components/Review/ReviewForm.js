@@ -1,17 +1,16 @@
-// src/components/review/ReviewForm.js
+// ===================================================================
+// src/components/review/ReviewForm.js - Version modifiée
+// ===================================================================
+
 import React from 'react';
-import { AlertCircle, CheckCircle, Loader, X } from 'lucide-react';
+import { AlertCircle, CheckCircle, Loader, X, Tag, Info } from 'lucide-react';
 import { useReviewForm } from '../../hooks/useReviewForm';
 import ReviewCriteriaSection from './ReviewCriteriaSection';
 import ReceiptSection from './ReceiptSection';
 import PurchaseInfoSection from './PurchaseInfoSection';
 
 /**
- * Composant de formulaire pour créer un avis - Version refactorisée
- * @param {object} props - Propriétés du composant
- * @param {object} props.product - Données du produit
- * @param {function} props.onSuccess - Fonction appelée après création réussie
- * @param {function} props.onCancel - Fonction appelée lors de l'annulation
+ * Composant de formulaire pour créer un avis - Version avec critères spécifiques
  */
 const ReviewForm = ({ product, onSuccess, onCancel }) => {
   const {
@@ -23,7 +22,7 @@ const ReviewForm = ({ product, onSuccess, onCancel }) => {
     receiptUploaded,
     receiptItems,
     selectedItem,
-    authorizeReceiptSharing,
+    allowPublicDisplay, // CHANGEMENT : allowPublicDisplay au lieu de authorizeReceiptSharing
     purchaseDate,
     purchasePrice,
     purchasePriceReceipt,
@@ -39,10 +38,15 @@ const ReviewForm = ({ product, onSuccess, onCancel }) => {
     showLowMatchAlert,
     showZeroRatingAlert,
     averageRating,
-    receiptId, // Ajout de l'ID du ticket
+    receiptId,
+    
+    // NOUVEAUX : États pour les critères
+    criteriasLoading,
+    criteriasError,
+    categoryInfo,
     
     // Setters
-    setAuthorizeReceiptSharing,
+    setAllowPublicDisplay, // CHANGEMENT : setAllowPublicDisplay au lieu de setAuthorizeReceiptSharing
     setPurchaseDate,
     setPurchasePrice,
     setPurchasePriceReceipt,
@@ -64,14 +68,12 @@ const ReviewForm = ({ product, onSuccess, onCancel }) => {
 
   // Gestionnaire pour la mise à jour des informations d'achat
   const handlePurchaseInfoUpdate = (updatedData) => {
-    // Mettre à jour les états locaux avec les nouvelles données
     if (updatedData.purchaseDate) setPurchaseDate(updatedData.purchaseDate);
     if (updatedData.purchasePrice) setPurchasePrice(updatedData.purchasePrice);
     if (updatedData.purchasePriceReceipt) setPurchasePriceReceipt(updatedData.receipt.total_ttc);
     if (updatedData.storeName) setStoreName(updatedData.storeName);
     if (updatedData.postalCode) setPostalCode(updatedData.postalCode);
     
-    // Afficher un message de succès ou déclencher d'autres actions si nécessaire
     console.log('Informations d\'achat mises à jour:', updatedData);
   };
 
@@ -86,6 +88,14 @@ const ReviewForm = ({ product, onSuccess, onCancel }) => {
         <ReviewSuccessMessage matchScore={matchScore} />
       ) : (
         <form onSubmit={handleSubmitReview} className="space-y-6">
+          {/* NOUVELLE SECTION : Informations sur les critères utilisés */}
+          <CriteriaInfoSection 
+            criterias={criterias}
+            criteriasLoading={criteriasLoading}
+            criteriasError={criteriasError}
+            categoryInfo={categoryInfo}
+          />
+
           {/* Section critères d'évaluation */}
           <ReviewCriteriaSection
             criterias={criterias}
@@ -94,6 +104,8 @@ const ReviewForm = ({ product, onSuccess, onCancel }) => {
             averageRating={averageRating}
             showZeroRatingAlert={showZeroRatingAlert}
             validationErrors={validationErrors}
+            criteriasLoading={criteriasLoading}
+            criteriasError={criteriasError}
             onRatingChange={handleRatingChange}
             onRatingHover={handleRatingHover}
           />
@@ -114,16 +126,16 @@ const ReviewForm = ({ product, onSuccess, onCancel }) => {
             showLowMatchAlert={showLowMatchAlert}
             matchScore={matchScore}
             validationErrors={validationErrors}
-            authorizeReceiptSharing={authorizeReceiptSharing}
+            allowPublicDisplay={allowPublicDisplay} // CHANGEMENT
             product={product}
             onReceiptUpload={handleReceiptUpload}
             onReceiptItemsChange={handleReceiptItemsChange}
             onSelectItem={handleSelectItem}
             onToggleItemList={toggleItemList}
-            onAuthorizeReceiptSharingChange={setAuthorizeReceiptSharing}
+            onAllowPublicDisplayChange={setAllowPublicDisplay} // CHANGEMENT
           />
           
-          {/* Section informations d'achat extraites - VERSION EDITABLE */}
+          {/* Section informations d'achat extraites */}
           <PurchaseInfoSection
             aiDataAvailable={aiDataAvailable}
             purchaseDate={purchaseDate}
@@ -153,10 +165,80 @@ const ReviewForm = ({ product, onSuccess, onCancel }) => {
           <FormActions
             loading={loading}
             receiptUploaded={receiptUploaded}
+            criteriasError={criteriasError}
             onCancel={onCancel}
           />
         </form>
       )}
+    </div>
+  );
+};
+
+/**
+ * NOUVELLE SECTION : Informations sur les critères utilisés
+ */
+const CriteriaInfoSection = ({ criterias, criteriasLoading, criteriasError, categoryInfo }) => {
+  if (criteriasLoading) {
+    return (
+      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <div className="flex items-center">
+          <Loader size={16} className="animate-spin text-blue-600 mr-2" />
+          <span className="text-blue-700">Chargement des critères d'évaluation...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (criteriasError) {
+    return (
+      <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+        <div className="flex items-start">
+          <AlertCircle size={16} className="text-red-600 mr-2 mt-0.5" />
+          <div>
+            <span className="text-red-700 font-medium">Erreur de chargement des critères</span>
+            <p className="text-red-600 text-sm mt-1">{criteriasError}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (criterias.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+      <div className="flex items-center mb-3">
+        <Tag size={18} className="text-green-600 mr-2" />
+        <h4 className="font-medium text-green-800">
+          Critères d'évaluation pour ce produit
+          {categoryInfo?.categoryDisplayName && (
+            <span className="text-sm font-normal text-green-600 ml-2">
+              ({categoryInfo.categoryDisplayName})
+            </span>
+          )}
+        </h4>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {criterias.map((criteria, index) => (
+          <div key={criteria.id} className="bg-white rounded-lg p-3 border border-green-100">
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-medium text-gray-800 text-sm">{criteria.display_name}</span>
+              <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded">
+                ×{criteria.weight}
+              </span>
+            </div>
+            {criteria.description && (
+              <p className="text-xs text-gray-600">{criteria.description}</p>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex items-center text-xs text-green-700">
+        <Info size={12} className="mr-1" />
+        <span>Ces critères sont spécialisés pour cette catégorie de produit et seront utilisés pour calculer votre note.</span>
+      </div>
     </div>
   );
 };
@@ -222,9 +304,20 @@ const ReviewSuccessMessage = ({ matchScore }) => {
 };
 
 /**
- * Boutons d'action du formulaire
+ * Boutons d'action du formulaire (mis à jour)
  */
-const FormActions = ({ loading, receiptUploaded, onCancel }) => {
+const FormActions = ({ loading, receiptUploaded, criteriasError, onCancel }) => {
+  const isDisabled = loading || !receiptUploaded || criteriasError;
+  
+  let buttonText = 'Publier mon avis';
+  if (loading) {
+    buttonText = 'Envoi en cours...';
+  } else if (!receiptUploaded) {
+    buttonText = 'Téléchargez un ticket de caisse pour continuer';
+  } else if (criteriasError) {
+    buttonText = 'Erreur de chargement des critères';
+  }
+
   return (
     <div className="flex justify-end space-x-3">
       <button
@@ -237,19 +330,17 @@ const FormActions = ({ loading, receiptUploaded, onCancel }) => {
       <button
         type="submit"
         className={`bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition duration-300 flex items-center ${
-          loading ? 'opacity-70 cursor-not-allowed' : ''
+          isDisabled ? 'opacity-70 cursor-not-allowed' : ''
         }`}
-        disabled={loading || !receiptUploaded}
+        disabled={isDisabled}
       >
         {loading ? (
           <>
             <Loader size={18} className="mr-2 animate-spin" />
             Envoi en cours...
           </>
-        ) : !receiptUploaded ? (
-          'Téléchargez un ticket de caisse pour continuer'
         ) : (
-          'Publier mon avis'
+          buttonText
         )}
       </button>
     </div>

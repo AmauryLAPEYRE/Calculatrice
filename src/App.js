@@ -17,8 +17,11 @@ import ProductSearchEnhanced from './components/ProductSearchEnhanced';
 import ProfileNavigationTabs from './components/profile/ProfileNavigationTabs';
 // Importer les composants d'administration
 import AdminPanel from './components/admin/AdminPanel';
+
 import PendingReviews from './components/admin/PendingReviews'; 
 import AdminPendingChallenges from './components/admin/ChallengesModeration'; 
+import CategoryManagement from './components/admin/CategoryManagement';
+
 import NotFound from './pages/NotFound';
 import FAQ from './components/FAQ';
 import ConceptPage from './pages/ConceptPage';
@@ -168,6 +171,10 @@ function App() {
             {/* Nouvelle route pour la gestion des challenges */}
             <Route path="/admin/challenges" element={
               <AdminRoute element={<AdminPendingChallenges />} />
+            } />
+            {/* NOUVELLE : Route pour la gestion des catégories */}
+            <Route path="/admin/categories" element={
+              <AdminRoute element={<CategoryManagement />} />
             } />
             
             {/* Nouvelle route pour les politiques de confidentialités */}

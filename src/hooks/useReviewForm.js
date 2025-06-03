@@ -1,8 +1,8 @@
-// src/hooks/useReviewForm.js (version mise à jour pour allow_public_display)
+// src/hooks/useReviewForm.js - Version modifiée pour critères spécifiques
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
-  getReviewCriterias, 
+  getProductCriteriasSimple, // CHANGEMENT : Utiliser le nouveau service
   addProductReview
 } from '../services/reviewService';
 import { findBestMatchingItem } from '../utils/textSimilarityUtils';
@@ -15,7 +15,7 @@ import {
 
 /**
  * Hook personnalisé pour gérer la logique du formulaire d'avis
- * Version mise à jour pour utiliser allow_public_display
+ * Version mise à jour pour utiliser les critères spécifiques aux produits
  */
 export const useReviewForm = (product, onSuccess) => {
   const { currentUser, userDetails } = useAuth();
@@ -26,14 +26,18 @@ export const useReviewForm = (product, onSuccess) => {
   const [comment, setComment] = useState('');
   const [criterias, setCriterias] = useState([]);
   
+  // NOUVEAU : États pour les informations de critères
+  const [criteriasLoading, setCriteriasLoading] = useState(false);
+  const [criteriasError, setCriteriasError] = useState(null);
+  const [categoryInfo, setCategoryInfo] = useState(null);
+  
   // États du ticket de caisse
   const [receiptUploaded, setReceiptUploaded] = useState(false);
   const [receiptId, setReceiptId] = useState(null);
   const [receiptItems, setReceiptItems] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
   
-  // États des informations d'achat
-  // CHANGEMENT : Remplacer authorizeReceiptSharing par allowPublicDisplay
+  // États des informations d'achat (avec allowPublicDisplay)
   const [allowPublicDisplay, setAllowPublicDisplay] = useState(true);
   const [purchaseDate, setPurchaseDate] = useState('');
   const [purchasePrice, setPurchasePrice] = useState('');
@@ -55,7 +59,7 @@ export const useReviewForm = (product, onSuccess) => {
   const [showLowMatchAlert, setShowLowMatchAlert] = useState(false);
   const [showZeroRatingAlert, setShowZeroRatingAlert] = useState(false);
   
-  // Calcul de la note moyenne (inchangé)
+  // NOUVEAU : Calcul de la note moyenne avec les poids spécifiques
   const averageRating = useMemo(() => {
     if (!criterias.length) return 0;
     
@@ -65,8 +69,9 @@ export const useReviewForm = (product, onSuccess) => {
     criterias.forEach(criteria => {
       const rating = ratings[criteria.id] || 0;
       if (rating > 0) {
-        totalWeightedRating += rating * criteria.weight;
-        totalWeight += criteria.weight;
+        const weight = criteria.weight || 1.0; // Utiliser le poids du critère
+        totalWeightedRating += rating * weight;
+        totalWeight += weight;
       }
     });
     
@@ -75,30 +80,55 @@ export const useReviewForm = (product, onSuccess) => {
     return Math.round((totalWeightedRating / totalWeight) * 100) / 100;
   }, [ratings, criterias]);
   
-  // Chargement des critères d'évaluation (inchangé)
+  // MODIFIÉ : Chargement des critères spécifiques au produit
   useEffect(() => {
-    const fetchReviewCriterias = async () => {
-      const { success, data, error } = await getReviewCriterias();
+    const fetchProductCriterias = async () => {
+      if (!product || !product.code) {
+        setCriterias([]);
+        return;
+      }
+
+      setCriteriasLoading(true);
+      setCriteriasError(null);
       
-      if (success && data) {
-        setCriterias(data);
+      try {
+        console.log('🎯 Récupération des critères pour le produit:', product.code);
         
-        const initialRatings = {};
-        data.forEach(criteria => {
-          initialRatings[criteria.id] = 0;
-        });
-        setRatings(initialRatings);
-        setHoverRatings(initialRatings);
-      } else if (error) {
-        console.error("Erreur lors du chargement des critères:", error);
-        setError("Impossible de charger les critères d'évaluation. Veuillez réessayer plus tard.");
+        // Utiliser le nouveau service pour les critères spécifiques
+        const { success, data, error } = await getProductCriteriasSimple(product.code);
+        
+        if (success && data && data.length > 0) {
+          setCriterias(data);
+          console.log('✅ Critères spécifiques récupérés:', data);
+          
+          // Initialiser les ratings avec les nouveaux critères
+          const initialRatings = {};
+          const initialHoverRatings = {};
+          data.forEach(criteria => {
+            initialRatings[criteria.id] = 0;
+            initialHoverRatings[criteria.id] = 0;
+          });
+          setRatings(initialRatings);
+          setHoverRatings(initialHoverRatings);
+          
+        } else {
+          console.warn('⚠️ Aucun critère spécifique trouvé, utilisation des critères par défaut');
+          setCriteriasError("Aucun critère trouvé pour ce produit");
+          setCriterias([]);
+        }
+      } catch (err) {
+        console.error('💥 Exception lors du chargement des critères:', err);
+        setCriteriasError(err.message);
+        setCriterias([]);
+      } finally {
+        setCriteriasLoading(false);
       }
     };
     
-    fetchReviewCriterias();
-  }, []);
+    fetchProductCriterias();
+  }, [product?.code]); // Dépendance sur le code produit
   
-  // Vérifier si des notes sont à zéro (inchangé)
+  // Vérifier si des notes sont à zéro
   useEffect(() => {
     if (criterias.length > 0) {
       const hasZeroRating = criterias.some(criteria => ratings[criteria.id] === 0);
@@ -106,15 +136,15 @@ export const useReviewForm = (product, onSuccess) => {
     }
   }, [ratings, criterias]);
   
-  // Validation du formulaire (inchangé)
+  // Validation du formulaire
   const validateForm = () => {
     const errors = {};
     
     if (!comment.trim()) {
       errors.comment = "Le commentaire est obligatoire";
-   } else if (comment.trim().length < 20) {
-  errors.comment = "Le commentaire doit contenir au moins 20 caractères";
-}
+    } else if (comment.trim().length < 20) {
+      errors.comment = "Le commentaire doit contenir au moins 20 caractères";
+    }
     
     if (!selectedItem && receiptItems.length > 0) {
       errors.selectedItem = "Vous devez sélectionner un article du ticket";
@@ -125,11 +155,16 @@ export const useReviewForm = (product, onSuccess) => {
       errors.ratings = "Veuillez attribuer au moins une note";
     }
     
+    // NOUVEAU : Validation spécifique si aucun critère n'est chargé
+    if (criterias.length === 0) {
+      errors.criterias = "Impossible de charger les critères d'évaluation";
+    }
+    
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
   
-  // Gestionnaires d'événements (inchangés sauf pour les noms)
+  // Gestionnaires d'événements
   const handleRatingChange = (criteriaId, value) => {
     setRatings(prev => ({
       ...prev,
@@ -152,7 +187,7 @@ export const useReviewForm = (product, onSuccess) => {
   const handleCommentChange = (e) => {
     setComment(e.target.value);
     
-    if (e.target.value.trim().length >= 20)  {
+    if (e.target.value.trim().length >= 20) {
       setValidationErrors(prev => ({
         ...prev,
         comment: null
@@ -160,7 +195,7 @@ export const useReviewForm = (product, onSuccess) => {
     }
   };
   
-  // Gestionnaire d'upload de ticket (mise à jour)
+  // Gestionnaire d'upload de ticket (inchangé mais avec allowPublicDisplay)
   const handleReceiptUpload = async (receipt, url, extractedData, receiptItems = []) => {
     setReceiptUploaded(true);
     setReceiptId(receipt.id);
@@ -211,9 +246,11 @@ export const useReviewForm = (product, onSuccess) => {
         }));
       }
     }
-    if(receipt.total_ttc)
-      {setPurchasePriceReceipt(receipt.total_ttc.toString());
-      }
+    
+    if (receipt.total_ttc) {
+      setPurchasePriceReceipt(receipt.total_ttc.toString());
+    }
+    
     if (extractedData) {
       console.log("Données extraites par Claude AI:", extractedData);
       setAiData(extractedData);
@@ -290,7 +327,7 @@ export const useReviewForm = (product, onSuccess) => {
     }
   };
   
-  // Gestionnaire de soumission (mise à jour)
+  // MODIFIÉ : Gestionnaire de soumission avec critères spécifiques
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     
@@ -307,7 +344,17 @@ export const useReviewForm = (product, onSuccess) => {
     setError(null);
 
     try {
-      // CHANGEMENT : Utiliser allowPublicDisplay au lieu de authorizeSharing
+      // Préparer les ratings en utilisant les IDs des critères spécifiques
+      const ratingsToSend = {};
+      criterias.forEach(criteria => {
+        if (ratings[criteria.id] && ratings[criteria.id] > 0) {
+          ratingsToSend[criteria.id] = ratings[criteria.id];
+        }
+      });
+
+      console.log('📊 Ratings à envoyer avec critères spécifiques:', ratingsToSend);
+      console.log('📋 Critères utilisés:', criterias.map(c => ({ id: c.id, name: c.name, display_name: c.display_name, weight: c.weight })));
+
       const purchaseInfo = {
         price: purchasePrice ? parseFloat(purchasePrice) : null,
         priceReceipt: purchasePriceReceipt ? parseFloat(purchasePriceReceipt) : null,
@@ -315,7 +362,7 @@ export const useReviewForm = (product, onSuccess) => {
         location: null,
         storeName: storeName || null,
         postalCode: postalCode || null,
-        allowPublicDisplay: allowPublicDisplay, // CHANGEMENT ICI
+        allowPublicDisplay: allowPublicDisplay, // Utiliser allowPublicDisplay
         receiptItems: receiptItems,
         selectedItemId: selectedItem ? selectedItem.id : null,
         matchScore: matchScore
@@ -328,7 +375,7 @@ export const useReviewForm = (product, onSuccess) => {
         product.code,
         comment,
         receiptId,
-        ratings,
+        ratingsToSend, // Utiliser les ratings avec critères spécifiques
         purchaseInfo
       );
 
@@ -365,8 +412,7 @@ export const useReviewForm = (product, onSuccess) => {
     receiptId,
     receiptItems,
     selectedItem,
-    // CHANGEMENT : Exposer allowPublicDisplay au lieu de authorizeReceiptSharing
-    allowPublicDisplay,
+    allowPublicDisplay, // Exposer allowPublicDisplay
     purchaseDate,
     purchasePrice,
     purchasePriceReceipt,
@@ -384,9 +430,13 @@ export const useReviewForm = (product, onSuccess) => {
     showZeroRatingAlert,
     averageRating,
     
+    // NOUVEAUX : États pour les critères
+    criteriasLoading,
+    criteriasError,
+    categoryInfo,
+    
     // Setters
-    // CHANGEMENT : Exposer setAllowPublicDisplay au lieu de setAuthorizeReceiptSharing
-    setAllowPublicDisplay,
+    setAllowPublicDisplay, // Exposer setAllowPublicDisplay
     setPurchaseDate,
     setPurchasePrice,
     setStoreName,

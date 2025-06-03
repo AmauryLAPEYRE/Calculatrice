@@ -58,6 +58,9 @@ const PageInfos = ({ product }) => {
   return (
     <div>
       <div className="bg-gray-50 rounded-lg p-5 shadow-sm">
+        
+        {/* ================================================================== */}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Origine */}
           {product.manufacturing_places && (
@@ -185,15 +188,22 @@ const PageInfos = ({ product }) => {
         {/* Liste des catégories en fin de page */}
         {allCategories.length > 0 && (
           <div className="mt-6">
-            <h3 className="text-md font-medium text-gray-700 mb-3">Catégories</h3>
-            <div className="bg-white rounded-lg p-3 border border-gray-100">
+            <h3 className="text-md font-medium text-gray-700 mb-3">Toutes les catégories</h3>
+                <div className="bg-white rounded-lg p-3 border border-gray-100">
               <div className="flex flex-wrap gap-2">
                 {allCategories.map((category, index) => (
                   <span 
                     key={index} 
-                    className="inline-block bg-green-50 text-green-700 px-2 py-1 rounded-md text-sm"
+                    className={`inline-block px-2 py-1 rounded-md text-sm ${
+                      index === 0 
+                        ? 'bg-blue-100 text-blue-800 font-semibold border-2 border-blue-300' 
+                        : 'bg-green-50 text-green-700'
+                    }`}
                   >
                     {category}
+                    {index === 0 && (
+                      <span className="ml-1 text-xs opacity-75"></span>
+                    )}
                   </span>
                 ))}
               </div>

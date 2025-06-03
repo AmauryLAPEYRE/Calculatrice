@@ -667,7 +667,7 @@ const UserReviews = () => {
                         {/* Note globale */}
                         <div className="flex items-center gap-3">
                           {renderStars(review.average_rating)}
-                          <span className="font-bold text-gray-800">{review.average_rating.toFixed(1)}</span>
+                          <span className="font-bold text-gray-800">{review.average_rating.toFixed(2)}</span>
                           
                           {/* Badges */}
                           <div className="flex items-center gap-2">

@@ -1,4 +1,4 @@
-// src/components/Review/ReviewsDisplay.js
+// src/components/Review/ReviewsDisplay.js - Version modifiée
 import React, { useState, useEffect } from 'react';
 import { 
   Star, 
@@ -19,7 +19,10 @@ import {
   Shield,
   Camera,
   BarChart3,
-  ChevronRight
+  ChevronRight,
+  Tag, // Nouveau : pour les critères
+  Bot,  // Nouveau : pour les avis IA
+  Info  // Nouveau : pour les informations
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import UserAvatar from '../profile/UserAvatar';
@@ -40,7 +43,10 @@ const ReviewsDisplay = ({
   reviews = [],
   totalReviews = 0,
   averageRating = 0,
-  verifiedReviews = 0
+  verifiedReviews = 0,
+  // NOUVELLES PROPS
+  productCriterias = [], // Critères spécifiques au produit
+  categoryInfo = null    // Informations de catégorie
 }) => {
   const { currentUser, userDetails } = useAuth();
   const [error, setError] = useState(null);
@@ -49,6 +55,7 @@ const ReviewsDisplay = ({
   const [hoveredReview, setHoveredReview] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [showCriteriaInfo, setShowCriteriaInfo] = useState(false); // NOUVEAU
 
   // Vérifier les likes
   useEffect(() => {
@@ -169,6 +176,100 @@ const ReviewsDisplay = ({
     });
   };
 
+  // NOUVELLE FONCTION : Mapper les critères avec les ratings
+  const getCriteriaDisplayInfo = (review) => {
+    if (!productCriterias || productCriterias.length === 0) {
+      // Fallback sur l'affichage existant si pas de critères spécifiques
+      return Object.entries(review.ratings || {}).map(([key, value]) => ({
+        id: key,
+        name: key,
+        display_name: value.display_name,
+        rating: value.rating,
+        weight: value.weight || 1.0,
+        isFromProductCriteria: false
+      }));
+    }
+
+    // Utiliser les critères spécifiques au produit
+    return productCriterias.map(criteria => {
+      // Trouver le rating correspondant dans l'avis
+      const ratingEntry = Object.entries(review.ratings || {}).find(([key, value]) => {
+        return criteria.name === key || criteria.id === value.criteria_id || criteria.name === value.name;
+      });
+
+      return {
+        id: criteria.id,
+        name: criteria.name,
+        display_name: criteria.display_name,
+        rating: ratingEntry ? ratingEntry[1].rating : 0,
+        weight: criteria.weight,
+        description: criteria.description,
+        isFromProductCriteria: true
+      };
+    });
+  };
+
+  // NOUVELLE FONCTION : Afficher les informations sur les critères utilisés
+  const renderCriteriaInfoSection = () => {
+    if (!productCriterias || productCriterias.length === 0) return null;
+
+    return (
+      <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-2">
+            <Tag size={18} className="text-blue-600" />
+            <span className="font-semibold text-blue-800">
+              Critères d'évaluation utilisés
+              {categoryInfo?.categoryDisplayName && (
+                <span className="text-sm font-normal text-blue-600 ml-2">
+                  ({categoryInfo.categoryDisplayName})
+                </span>
+              )}
+            </span>
+          </div>
+          <button
+            onClick={() => setShowCriteriaInfo(!showCriteriaInfo)}
+            className="text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            <ChevronRight 
+              size={16} 
+              className={`transform transition-transform ${showCriteriaInfo ? 'rotate-90' : ''}`} 
+            />
+          </button>
+        </div>
+        
+        {showCriteriaInfo && (
+          <div className="space-y-2">
+            <p className="text-sm text-blue-700 mb-3">
+              Les avis sont évalués selon ces critères spécifiques à la catégorie du produit :
+            </p>
+            {productCriterias.map((criteria, index) => (
+              <div key={criteria.id} className="flex items-center justify-between py-2 px-3 bg-white rounded-lg">
+                <div className="flex-1">
+                  <span className="font-medium text-gray-800">{criteria.display_name}</span>
+                  {criteria.description && (
+                    <p className="text-sm text-gray-600 mt-1">{criteria.description}</p>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-500">Coef.</span>
+                  <span className="font-bold text-blue-600">{criteria.weight}</span>
+                </div>
+              </div>
+            ))}
+            {!categoryInfo?.hasCategory && (
+              <div className="mt-2 p-2 bg-amber-100 rounded-lg">
+                <p className="text-xs text-amber-800">
+                  💡 Ce produit utilise les critères par défaut. 
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (!product) return null;
 
   const showDetailedRatings = product && (
@@ -179,38 +280,38 @@ const ReviewsDisplay = ({
 
   return (
     <div className="space-y-8">
-
+      {/* NOUVELLE SECTION : Informations sur les critères */}
+      {renderCriteriaInfoSection()}
 
       {/* Section des avis */}
-      
       <div>
         <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
-          {/* Avis utilsiateur*/}
+          {/* Avis utilisateur */}
           <div className="flex text-center">
-              <h3 className="text-2xl font-bold text-green-800 mb-4 flex items-center">
-            <MessageSquare size={28} className="mr-3 text-green-600" />
-            Avis des utilisateurs
-            {totalReviews > 0 && (
-              <span className="ml-3 text-lg font-normal text-gray-600">
-                ({totalReviews} avis)
-              </span>
-            )}
+            <h3 className="text-2xl font-bold text-green-800 mb-4 flex items-center">
+              <MessageSquare size={28} className="mr-3 text-green-600" />
+              Avis des utilisateurs
+              {totalReviews > 0 && (
+                <span className="ml-3 text-lg font-normal text-gray-600">
+                  ({totalReviews} avis)
+                </span>
+              )}
             </h3>
           </div>
-          {/* Bouton Donner mon avis*/}
+          {/* Bouton Donner mon avis */}
           <div className="flex text-center mb-4">
-                      <button
-                onClick={onAddReviewClick}
-                className={`group bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 flex items-center ${
-                  buttonState.disabled ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-                disabled={buttonState.disabled}
-                title={buttonState.tooltip || ''}
-              >
-                <MessageSquare size={24} className="mr-3" />
-                <span className="text-lg">{buttonState.message || "Donner mon avis"}</span>
-                <Sparkles size={16} className="ml-2 animate-pulse" />
-              </button>
+            <button
+              onClick={onAddReviewClick}
+              className={`group bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 flex items-center ${
+                buttonState.disabled ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              disabled={buttonState.disabled}
+              title={buttonState.tooltip || ''}
+            >
+              <MessageSquare size={24} className="mr-3" />
+              <span className="text-lg">{buttonState.message || "Donner mon avis"}</span>
+              <Sparkles size={16} className="ml-2 animate-pulse" />
+            </button>
           </div>
         </div>
 
@@ -231,200 +332,263 @@ const ReviewsDisplay = ({
           </div>
         ) : reviews.length > 0 ? (
           <div className="space-y-6">
-            {reviews.map((review, index) => (
-              <div 
-                key={review.id} 
+            {reviews.map((review, index) => {
+              // NOUVEAU : Récupérer les informations des critères pour cet avis
+              const criteriaDisplayInfo = getCriteriaDisplayInfo(review);
+              
+              return (
+                <div 
+                  key={review.id} 
                   className={`group rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.01] border overflow-hidden ${
                     review.review_source === 'ai' 
                       ? 'bg-white border-red-200' // Fond blanc avec bordure rouge pour les avis IA
                       : 'bg-white border-gray-100'  // Fond blanc avec bordure grise pour les avis utilisateurs
                   }`}
-                onMouseEnter={() => setHoveredReview(review.id)}
-                onMouseLeave={() => setHoveredReview(null)}
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
-                {/* En-tête de l'avis */}
+                  onMouseEnter={() => setHoveredReview(review.id)}
+                  onMouseLeave={() => setHoveredReview(null)}
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
+                  {/* En-tête de l'avis */}
                   <div className={`${
-                  review.review_source === 'ai' 
-                    ? 'bg-gradient-to-r from-red-100 to-red-50' // En-tête rouge pour IA
-                    : 'bg-gradient-to-r from-green-50 to-emerald-50' // En-tête verte pour utilisateurs
-                } p-6`}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center">
-                      {/* Avatar utilisateur avec UserAvatar ou emoji robot pour IA */}
-                      {review.review_source === 'ai' ? (
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center text-white font-bold text-lg mr-4">
-                          🤖
-                        </div>
-                      ) : (
-                        <div 
-                          className="mr-4 cursor-pointer"
-                          onClick={() => handleUserClick(review)}
-                        >
-                          <UserAvatar 
-                            userId={review.user_firebase_uid || `user-${review.user_id}`}
-                            size={48}
-                            status={review.user_status || 'bronze'}
-                            displayName={review.user_name}
-                            customAvatarUrl={review.user_avatar_url}
-                            avatarSeed={review.user_avatar_seed || review.user_firebase_uid || `user-${review.user_id}`}
-                            className="hover:scale-110 transition-transform duration-300 shadow-md"
-                            showBorder={true}
-                          />
-                        </div>
-                      )}
-                      <div>
-                        <div className="flex items-center gap-3">
-                          <h4 
-                            className={`font-semibold ${
-                              review.review_source === 'ai' 
-                                ? 'text-gray-800' 
-                                : 'text-green-800 cursor-pointer hover:text-green-600 transition-colors hover:underline'
-                            }`}
-                            onClick={() => review.review_source !== 'ai' && handleUserClick(review)}
+                    review.review_source === 'ai' 
+                      ? 'bg-gradient-to-r from-red-100 to-red-50' // En-tête rouge pour IA
+                      : 'bg-gradient-to-r from-green-50 to-emerald-50' // En-tête verte pour utilisateurs
+                  } p-6`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center">
+                        {/* Avatar utilisateur avec UserAvatar ou emoji robot pour IA */}
+                        {review.review_source === 'ai' ? (
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center text-white font-bold text-lg mr-4 shadow-lg">
+                            <Bot size={24} />
+                          </div>
+                        ) : (
+                          <div 
+                            className="mr-4 cursor-pointer"
+                            onClick={() => handleUserClick(review)}
                           >
-                            {review.user_name}
-                          </h4>
-                          {review.review_source !== 'ai' && review.is_verified  && (
-                            <span className="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full flex items-center font-medium">
-                              <CheckCircle size={14} className="mr-1" />
-                              Achat vérifié
-                            </span>
-                          )}
-          {review.review_source === 'ai' && (
-            <span className="bg-red-100 text-red-700 text-xs px-3 py-1 rounded-full flex items-center font-medium">
-              <CheckCircle size={14} className="mr-1" />
-              Généré par l'IA
-            </span>
-          )}
+                            <UserAvatar 
+                              userId={review.user_firebase_uid || `user-${review.user_id}`}
+                              size={48}
+                              status={review.user_status || 'bronze'}
+                              displayName={review.user_name}
+                              customAvatarUrl={review.user_avatar_url}
+                              avatarSeed={review.user_avatar_seed || review.user_firebase_uid || `user-${review.user_id}`}
+                              className="hover:scale-110 transition-transform duration-300 shadow-md"
+                              showBorder={true}
+                            />
+                          </div>
+                        )}
+                        <div>
+                          <div className="flex items-center gap-3">
+                            <h4 
+                              className={`font-semibold ${
+                                review.review_source === 'ai' 
+                                  ? 'text-gray-800' 
+                                  : 'text-green-800 cursor-pointer hover:text-green-600 transition-colors hover:underline'
+                              }`}
+                              onClick={() => review.review_source !== 'ai' && handleUserClick(review)}
+                            >
+                              {review.user_name}
+                            </h4>
+                            {review.review_source !== 'ai' && review.is_verified && (
+                              <span className="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full flex items-center font-medium">
+                                <CheckCircle size={14} className="mr-1" />
+                                Achat vérifié
+                              </span>
+                            )}
+                            {review.review_source === 'ai' && (
+                              <span className="bg-red-100 text-red-700 text-xs px-3 py-1 rounded-full flex items-center font-medium">
+                                <Bot size={14} className="mr-1" />
+                                Généré par l'IA
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-500 mt-1">{formatDate(review.date)}</p>
                         </div>
-                        <p className="text-sm text-gray-500 mt-1">{formatDate(review.date)}</p>
                       </div>
+
+                      {/* Bouton like */}
+                      <button 
+                        className={`group/like p-3 rounded-full transition-all duration-300 ${
+                          reviewLikes[review.id] 
+                            ? 'bg-green-100 text-green-600' 
+                            : 'bg-gray-100 text-gray-400 hover:bg-green-50 hover:text-green-600'
+                        }`}
+                        onClick={() => handleLikeReview(review.id)}
+                      >
+                        <div className="flex items-center">
+                          <ThumbsUp 
+                            size={20} 
+                            className={`transition-transform group-hover/like:scale-110 ${
+                              reviewLikes[review.id] ? 'fill-green-600' : ''
+                            }`} 
+                          />
+                          {review.likes_count > 0 && (
+                            <span className="ml-2 font-medium">{review.likes_count}</span>
+                          )}
+                        </div>
+                      </button>
                     </div>
 
-                    {/* Bouton like */}
-                    <button 
-                      className={`group/like p-3 rounded-full transition-all duration-300 ${
-                        reviewLikes[review.id] 
-                          ? 'bg-green-100 text-green-600' 
-                          : 'bg-gray-100 text-gray-400 hover:bg-green-50 hover:text-green-600'
-                      }`}
-                      onClick={() => handleLikeReview(review.id)}
-                    >
+                    {/* Note principale */}
+                    <div className="mt-4 flex items-center gap-3">
+                      {renderPreciseStars(review.average_rating, 24)}
+                      <span className={`text-xl font-bold ${
+                        review.review_source === 'ai' ? 'text-red-800' : 'text-green-800'
+                      }`}>
+                        {parseFloat(review.average_rating).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Bandeau d'information pour les avis IA */}
+                  {review.review_source === 'ai' && (
+                    <div className="bg-red-100 border-l-4 border-red-400 p-4 mx-6 mt-4 rounded">
                       <div className="flex items-center">
-                        <ThumbsUp 
-                          size={20} 
-                          className={`transition-transform group-hover/like:scale-110 ${
-                            reviewLikes[review.id] ? 'fill-green-600' : ''
-                          }`} 
-                        />
-                        {review.likes_count > 0 && (
-                          <span className="ml-2 font-medium">{review.likes_count}</span>
-                        )}
+                        <Info size={16} className="text-red-600 mr-2" />
+                        <div className="text-red-600 text-sm">
+                          <strong>Avis simulé :</strong> Cet avis a été généré par intelligence artificielle à des fins de démonstration.
+                        </div>
                       </div>
-                    </button>
-                  </div>
+                    </div>
+                  )}
 
-                  {/* Note principale */}
-         <div className="mt-4 flex items-center gap-3">
-    {renderPreciseStars(review.average_rating, 24)}
-    <span className={`text-xl font-bold ${
-      review.review_source === 'ai' ? 'text-red-800' : 'text-green-800'
-    }`}>
-                      {parseFloat(review.average_rating).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-                {review.review_source === 'ai' && (
-  <div className="bg-red-100 border-l-4 border-red-400 p-4 mx-6 mt-4 rounded">
-    <div className="flex items-center">
-      <div className="text-red-600 text-sm">
-        <strong>Avis simulé :</strong> Cet avis a été généré par intelligence artificielle à des fins de démonstration.
-      </div>
-    </div>
-  </div>
-)}
-                {/* Corps de l'avis */}
-                <div className="p-6">
-                  {/* Notes détaillées */}
-                  {Object.keys(review.ratings).length > 0 && (
-                    <div className="flex flex-wrap gap-3 mb-4">
-                      {Object.entries(review.ratings).map(([key, value]) => (
-                        <div 
-                          key={key} 
-                          className="bg-gray-50 rounded-lg px-3 py-2 flex items-center gap-2"
-                        >
-                          <span className="text-sm text-gray-600">{value.display_name}:</span>
-                          {renderPreciseStars(value.rating, 14)}
-                          <span className="text-sm font-medium text-gray-800">
-                            {value.rating}/5
+                  {/* Corps de l'avis */}
+                  <div className="p-6">
+                    {/* NOUVELLE SECTION : Notes détaillées avec critères spécifiques */}
+                    {criteriaDisplayInfo.length > 0 && (
+                      <div className="mb-4">
+                        <div className="flex items-center mb-3">
+                          <Tag size={16} className={`mr-2 ${
+                            review.review_source === 'ai' ? 'text-red-600' : 'text-green-600'
+                          }`} />
+                          <span className="text-sm font-medium text-gray-700">
+                            Évaluation par critères
+                            {criteriaDisplayInfo[0]?.isFromProductCriteria && categoryInfo?.categoryDisplayName && (
+                              <span className="text-xs text-gray-500 ml-2">
+                                ({categoryInfo.categoryDisplayName})
+                              </span>
+                            )}
                           </span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Commentaire */}
-              {review.review_source === 'ai' ? (
-                  <p className="bg-gradient-to-br from-red-100 flex  text-gray-700  leading-relaxed font-small"><span className="pl-2">{review.comment}</span></p>
-              ):(<p className="bg-gradient-to-br from-green-100 flex  text-gray-700  leading-relaxed font-small"><span className="pl-2">{review.comment}</span></p>)}
-                  {/* Informations d'achat */}
-                  {(review.purchase_date || review.purchase_price || review.store_name) && (
-                    <div className="mt-6 pt-6 border-t border-gray-100">
-                      <h5 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-                        {review.review_source === 'ai' ? (
-  <BarChart3 size={16} className="mr-2 text-red-600" />     // Icône moyenne rouge pour IA
-) : (
-  <ShoppingBag size={16} className="mr-2 text-green-600" /> // Icône shopping verte pour utilisateurs
-)}
-                        {review.review_source === 'ai' ? 'Prix moyen' : 'Détails de l\'achat'}
-                      </h5>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {review.purchase_date && (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Calendar size={14} className="text-gray-400 mr-2" />
-                            {formatDate(review.purchase_date)}
-                          </div>
-                        )}
-
-                        {review.purchase_price && review.review_source != 'ai' &&(
-                          <div className="flex items-center text-sm">
-                            <span className="font-medium text-green-700">
-                              {formatPrice(review.purchase_price)}
-                            </span>
-                          </div>
-                        )}
-                        {review.purchase_price && review.review_source === 'ai' &&(
-                          <div className="flex items-center text-sm">
-                            <span className="font-medium text-red-700">
-                              {formatPrice(review.purchase_price)}
-                            </span>
-                          </div>
-                        )}
-                        {review.store_name && (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <MapPin size={14} className="text-gray-400 mr-2" />
-                            {review.store_name} {review.code_postal}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {criteriaDisplayInfo.map((criteria) => (
+                            <div 
+                              key={criteria.id} 
+                              className={`rounded-lg px-3 py-3 flex flex-col gap-2 border ${
+                                review.review_source === 'ai' 
+                                  ? 'bg-red-50 border-red-200' 
+                                  : 'bg-green-50 border-green-200'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-gray-800">
+                                  {criteria.display_name}
+                                </span>
+                                <div className="flex items-center space-x-1">
+                                  <span className="text-xs text-gray-500">×</span>
+                                  <span className={`text-xs font-bold ${
+                                    review.review_source === 'ai' ? 'text-red-600' : 'text-green-600'
+                                  }`}>
+                                    {criteria.weight}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                {renderPreciseStars(criteria.rating, 16)}
+                                <span className="text-sm font-medium text-gray-800">
+                                  {criteria.rating}/5
+                                </span>
+                              </div>
+                              {criteria.description && criteria.isFromProductCriteria && (
+                                <p className="text-xs text-gray-600 mt-1">
+                                  {criteria.description}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        
+                        {/* Indication sur l'origine des critères */}
+                        {criteriaDisplayInfo[0]?.isFromProductCriteria && (
+                          <div className="mt-3 flex items-center text-xs text-gray-600">
+                            <Info size={12} className="mr-1" />
+                            <span>Critères spécialisés pour cette catégorie de produit</span>
                           </div>
                         )}
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Bouton ticket de caisse */}
-                  {review.can_show_receipt && (
-                    <button
-                      onClick={() => handleViewReceipt(review.id)}
-                      className="mt-4 text-green-600 hover:text-green-700 text-sm font-medium flex items-center group/receipt"
-                    >
-                      <Camera size={16} className="mr-2 group-hover/receipt:scale-110 transition-transform" />
-                      Voir le ticket de caisse
-                      <ChevronRight size={14} className="ml-1 group-hover/receipt:translate-x-1 transition-transform" />
-                    </button>
-                  )}
+                    {/* Commentaire */}
+                    {review.review_source === 'ai' ? (
+                      <div className="bg-gradient-to-br from-red-50 to-red-25 rounded-lg p-4 border-l-4 border-red-300">
+                        <p className="text-gray-700 leading-relaxed italic">
+                          {review.comment}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-gradient-to-br from-green-50 to-green-25 rounded-lg p-4 border-l-4 border-green-300">
+                        <p className="text-gray-700 leading-relaxed">
+                          {review.comment}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Informations d'achat */}
+                    {(review.purchase_date || review.purchase_price || review.store_name) && (
+                      <div className="mt-6 pt-6 border-t border-gray-100">
+                        <h5 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                          {review.review_source === 'ai' ? (
+                            <BarChart3 size={16} className="mr-2 text-red-600" />     // Icône moyenne rouge pour IA
+                          ) : (
+                            <ShoppingBag size={16} className="mr-2 text-green-600" /> // Icône shopping verte pour utilisateurs
+                          )}
+                          {review.review_source === 'ai' ? 'Prix moyen' : 'Détails de l\'achat'}
+                        </h5>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {review.purchase_date && (
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Calendar size={14} className="text-gray-400 mr-2" />
+                              {formatDate(review.purchase_date)}
+                            </div>
+                          )}
+
+                          {review.purchase_price && (
+                            <div className="flex items-center text-sm">
+                              <DollarSign size={14} className="text-gray-400 mr-2" />
+                              <span className={`font-medium ${
+                                review.review_source === 'ai' ? 'text-red-700' : 'text-green-700'
+                              }`}>
+                                {formatPrice(review.purchase_price)}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {review.store_name && (
+                            <div className="flex items-center text-sm text-gray-600">
+                              <MapPin size={14} className="text-gray-400 mr-2" />
+                              {review.store_name} {review.code_postal}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Bouton ticket de caisse */}
+                    {review.can_show_receipt && (
+                      <button
+                        onClick={() => handleViewReceipt(review.id)}
+                        className="mt-4 text-green-600 hover:text-green-700 text-sm font-medium flex items-center group/receipt"
+                      >
+                        <Camera size={16} className="mr-2 group-hover/receipt:scale-110 transition-transform" />
+                        Voir le ticket de caisse
+                        <ChevronRight size={14} className="ml-1 group-hover/receipt:translate-x-1 transition-transform" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="bg-gradient-to-br from-gray-50 to-white rounded-3xl p-12 text-center border border-gray-200">

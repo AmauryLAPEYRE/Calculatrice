@@ -7,7 +7,7 @@ import React from 'react';
 const ProductExamples = ({ examples, onSelectExample }) => {
   return (
     <div className="mt-6">
-      <h3 className="text-lg font-semibold mb-3">Exemples de codes-barres</h3>
+      <h3 className="text-lg font-semibold mb-3">Exemples de codes-barres.</h3>
       <p className="text-sm text-green-700 mb-3">
         Si vous rencontrez des difficultés, essayez un de ces codes-barres qui fonctionnent bien avec l'API:
       </p>

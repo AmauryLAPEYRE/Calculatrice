@@ -1,7 +1,7 @@
 // src/services/aiReviewService.js
 
 import { supabase } from '../supabaseClient';
-
+import {getProductReviewCriterias} from './reviewService'
 /**
  * Service pour gérer la génération automatique d'avis avec l'IA
  */
@@ -88,14 +88,20 @@ export const generateAIReview = async (params) => {
       params.onProgress('Initialisation de la génération d\'avis IA...');
     }
 
+
+
+
     // Préparer les paramètres avec valeurs par défaut
     const requestParams = {
       productCode: params.productCode,
       productName: params.productName,
       userId: params.userId,
-      criteria1: params.criteria1 || 'GOUT',
-      criteria2: params.criteria2 || 'QUANTITÉ',
-      criteria3: params.criteria3 || 'PRIX'
+      criteria1: params.criteres.data[0].display_name || 'GOUT',
+      criteria2: params.criteres.data[1].display_name || 'QUANTITÉ',
+      criteria3: params.criteres.data[2].display_name || 'PRIX',
+      criteria1Id: params.criteres.data[0].id || '43b1121b-0ffe-478c-aa8c-ed38ef37e234',
+      criteria2Id: params.criteres.data[1].id || 'e5f32be3-d08c-41be-bbae-db313ed0cb27',
+      criteria3Id: params.criteres.data[2].id || '9ad348fb-b617-4af8-97c7-ab9f22739f0c'
     };
 
     console.log('📤 Envoi de la requête à l\'API IA:', requestParams);
@@ -259,13 +265,18 @@ export const autoGenerateReviewIfNeeded = async (product, userId, onSuccess, onE
     if (onProgress) {
       onProgress('Vérification des avis IA existants...');
     }
+   // vérification des criteres suivant le produit
+    const criteresResult = await getProductReviewCriterias(product.code);
+      
 
     // Déclencher la génération
     const result = await generateAIReview({
       productCode: product.code,
       productName: product.product_name,
       userId: userId,
-      onProgress: onProgress
+      onProgress: onProgress,
+      criteres: criteresResult
+
     });
 
     if (result.success) {
