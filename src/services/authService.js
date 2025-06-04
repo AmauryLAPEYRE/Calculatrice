@@ -7,11 +7,10 @@ import {
     updateProfile,
     GoogleAuthProvider,
     signInWithPopup,
-    signInWithRedirect,
-    getRedirectResult,
+    OAuthProvider, // ✅ AJOUT pour Apple
     onAuthStateChanged
 } from "firebase/auth";
-import { auth, db } from "../firebase";
+import { auth} from "../firebase";
 import { syncUserWithSupabase } from "../supabaseClient"; // Import ajouté
 
 // Créer un nouvel utilisateur
@@ -110,6 +109,53 @@ export const signInWithGoogle = async () => {
         
       default:
         throw error;
+    }
+  }
+};
+
+// ✅ NOUVELLE FONCTION : Apple Sign-In
+export const signInWithApple = async () => {
+  try {
+    const provider = new OAuthProvider('apple.com');
+    provider.addScope('email');
+    provider.addScope('name');
+    
+    const result = await signInWithPopup(auth, provider);
+    
+    if (!result) {
+      throw new Error('Connexion Apple échouée');
+    }
+    
+    // Gestion du nom utilisateur (Apple le fournit qu'une fois)
+    let displayName = result.user.displayName;
+    
+    if (!displayName && result._tokenResponse?.fullName) {
+      const fullName = result._tokenResponse.fullName;
+      displayName = `${fullName.givenName || ''} ${fullName.familyName || ''}`.trim();
+      
+      if (displayName) {
+        await updateProfile(result.user, { displayName });
+      }
+    }
+    
+    if (!displayName && result.user.email) {
+      displayName = result.user.email.split('@')[0];
+      await updateProfile(result.user, { displayName });
+    }
+    
+    return result;
+    
+  } catch (error) {
+    // Gestion des erreurs
+    switch (error.code) {
+      case 'auth/popup-blocked':
+        throw new Error('Popup bloqué. Autorisez les popups pour ce site.');
+      case 'auth/popup-closed-by-user':
+        throw new Error('Connexion annulée');
+      case 'auth/network-request-failed':
+        throw new Error('Erreur réseau. Vérifiez votre connexion.');
+      default:
+        throw new Error(error.message || 'Erreur lors de la connexion Apple');
     }
   }
 };

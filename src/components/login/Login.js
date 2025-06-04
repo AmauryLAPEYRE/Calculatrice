@@ -1,4 +1,6 @@
 // src/components/login/Login.js
+// Import en haut
+import { useAuth } from '../../contexts/AuthContext';
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -11,14 +13,10 @@ import {
   LogIn,
   ChevronRight,
   Shield,
-  Sparkles,
   Users,
   Star,
-  ArrowRight,
   CheckCircle,
-  AlertCircle,
-  Zap,
-  Heart
+  AlertCircle
 } from 'lucide-react';
 
 const Login = () => {
@@ -32,6 +30,8 @@ const Login = () => {
   const [isVisible, setIsVisible] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  // Dans le composant, récupérez la fonction :
+  const { loginWithApple } = useAuth(); // ou loginWithGoogle selon le composant
 
   // Animation au chargement
   useEffect(() => {
@@ -213,6 +213,27 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+// Fonction de gestion :
+const handleAppleSignIn = async () => {
+  if (loading) return;
+  setError('');
+  setLoading(true);
+  
+  try {
+    const result = await loginWithApple();
+    if (result) {
+      navigate('/'); // ou autre redirection
+    }
+  } catch (error) {
+    if (error.message !== 'Connexion annulée') {
+      setError(error.message);
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <section className="min-h-screen bg-gradient-to-br from-green-50 to-white py-20">
@@ -458,7 +479,7 @@ const Login = () => {
                     <button
                       type="button"
                       onClick={handleGoogleSignIn}
-                      className="w-full bg-white border-2 border-gray-200 py-4 px-6 rounded-xl hover:border-gray-300 hover:shadow-md transform hover:scale-[1.02] transition-all duration-300 active:scale-[0.98] flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
+                      className="w-full bg-white border-2 border-gray-200 py-4 px-6 rounded-xl hover:border-gray-300 hover:shadow-md transform hover:scale-[1.02] transition-all duration-300 active:scale-[0.98] flex items-center justify-center disabled:opacity-70 mb-4 disabled:cursor-not-allowed disabled:transform-none"
                       disabled={loading}
                     >
                       {loading ? (
@@ -478,6 +499,28 @@ const Login = () => {
                         </>
                       )}
                     </button>
+                    
+<button
+  type="button"
+  onClick={handleAppleSignIn}
+  className="w-full bg-black hover:bg-gray-800 text-white py-4 px-6 rounded-xl transform hover:scale-[1.02] transition-all duration-300 active:scale-[0.98] flex items-center justify-center disabled:opacity-70"
+  disabled={loading}
+>
+  {loading ? (
+    <>
+      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+      <span>Connexion...</span>
+    </>
+  ) : (
+    <>
+      {/* Icône Apple */}
+      <svg viewBox="0 0 24 24" width="20" height="20" className="mr-3" fill="currentColor">
+        <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+      </svg>
+      <span className="font-medium">Continuer avec Apple</span>
+    </>
+  )}
+</button>
                   </>
                 )}
               </div>
@@ -501,7 +544,7 @@ const Login = () => {
                 <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Star className="text-amber-600 fill-amber-600" size={32} />
                 </div>
-                <p className="text-3xl font-bold text-gray-800">4.8/5</p>
+                <p className="text-3xl font-bold text-gray-800">4.85/5</p>
                 <p className="text-gray-600">Note moyenne</p>
               </div>
               

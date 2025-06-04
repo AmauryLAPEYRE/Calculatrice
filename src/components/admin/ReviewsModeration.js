@@ -1,6 +1,8 @@
 // src/components/admin/ReviewsModeration.js
 import { useState, useEffect } from 'react';
 import { Star, MessageSquare, AlertCircle, Loader, ShoppingBag, MapPin, Calendar, DollarSign, Check, X, Eye } from 'lucide-react';
+// Utilisation Log/console Pour prod
+import {logger } from '../../utils/logger';
 import { 
   getPendingReviews,
   approveReview,
@@ -54,7 +56,7 @@ const ReviewsModeration = () => {
       }
     } catch (err) {
       setError('Une erreur est survenue lors de la communication avec le serveur');
-      console.error('Erreur détaillée:', err);
+      logger.error('Erreur détaillée:', err);
     } finally {
       setLoading(false);
     }
@@ -76,7 +78,7 @@ const ReviewsModeration = () => {
       }
     } catch (err) {
       setError('Une erreur est survenue lors de la communication avec le serveur');
-      console.error('Erreur détaillée:', err);
+      logger.error('Erreur détaillée:', err);
     } finally {
       setProcessing(null);
     }
@@ -114,7 +116,7 @@ const ReviewsModeration = () => {
       }
     } catch (err) {
       setError('Une erreur est survenue lors de la communication avec le serveur');
-      console.error('Erreur détaillée:', err);
+      logger.error('Erreur détaillée:', err);
     } finally {
       setProcessing(null);
     }
@@ -132,7 +134,7 @@ const ReviewsModeration = () => {
       }
     } catch (err) {
       setError('Une erreur est survenue lors de la récupération de l\'image');
-      console.error('Erreur détaillée:', err);
+      logger.error('Erreur détaillée:', err);
     }
   };
 

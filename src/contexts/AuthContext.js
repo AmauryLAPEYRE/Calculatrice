@@ -5,11 +5,13 @@ import {
   signOut as firebaseSignOut
 } from "firebase/auth";
 import { auth } from "../firebase";
-import { supabase, syncUserWithSupabase, getUserSubscription } from '../supabaseClient';
+import { supabase, syncUserWithSupabase, getUserSubscription, 
+      getSupabaseWithAuth } from '../supabaseClient';
 import { 
   loginUser, 
   registerUser, 
-  resetPassword, 
+  resetPassword,
+  signInWithApple, 
   signInWithGoogle
 } from '../services/authService';
 
@@ -59,6 +61,16 @@ export const AuthProvider = ({ children }) => {
       throw error;
     }
   };
+
+const loginWithApple = async () => {
+  try {
+    const result = await signInWithApple();
+    return result ? result.user : null;
+  } catch (error) {
+    setError(error.message);
+    throw error;
+  }
+};
 
   // Fonction pour se déconnecter
   const logout = async () => {
@@ -228,6 +240,9 @@ export const AuthProvider = ({ children }) => {
       setCurrentUser(user);
       
       if (user) {
+              // AJOUT : Configurez les headers Supabase
+       console.log('✅ Utilisateur connecté:', user.uid);
+       getSupabaseWithAuth();
         await fetchUserDetails(user);
       } else {
         setUserDetails(null);
@@ -357,6 +372,7 @@ export const AuthProvider = ({ children }) => {
     login,
     signup,
     loginWithGoogle,  // Version popup simplifiée
+    loginWithApple, 
     logout,
     forgotPassword,
     hasActiveSubscription,

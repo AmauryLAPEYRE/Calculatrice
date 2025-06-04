@@ -1,5 +1,7 @@
 // src/components/admin/AdminPanel.js - Modifié pour inclure l'onglet des catégories
 import { useState, useEffect } from 'react';
+// Utilisation Log/console Pour prod
+import {logger } from '../../utils/logger';
 import { useNavigate, Link ,useLocation} from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../supabaseClient';
@@ -128,7 +130,7 @@ const AdminPanel = () => {
         if (statsSuccess) {
           setReviewStats(stats);
         } else if (statsError) {
-          console.error("Erreur lors de la récupération des statistiques des avis:", statsError);
+          logger.error("Erreur lors de la récupération des statistiques des avis:", statsError);
         }
         
         // Compter le nombre total de produits
@@ -256,7 +258,7 @@ const AdminPanel = () => {
         setFilteredUsers(data);
         setSubscriptionPlans(plans);
       } catch (err) {
-        console.error("Erreur lors de la récupération des données:", err);
+        logger.error("Erreur lors de la récupération des données:", err);
         setError("Impossible de charger les données.");
       } finally {
         setLoading(false);
@@ -328,7 +330,7 @@ const AdminPanel = () => {
           .eq('is_active', true)
           .eq('payment_method', 'offert');
       } catch (err) {
-        console.log("Note: Aucun abonnement offert actif à désactiver ou erreur:", err.message);
+        logger.info("Note: Aucun abonnement offert actif à désactiver ou erreur:", err.message);
       }
       
       // Calculer les dates d'abonnement
@@ -409,7 +411,7 @@ const AdminPanel = () => {
         closeModal();
       }, 3000);
     } catch (err) {
-      console.error("Erreur lors de l'assignation de l'abonnement:", err);
+      logger.error("Erreur lors de l'assignation de l'abonnement:", err);
       setError(`Erreur: ${err.message}`);
     } finally {
       setIsProcessing(false);
@@ -435,7 +437,7 @@ const AdminPanel = () => {
       setSubscriptionHistory(data);
       setHistoryModalOpen(true);
     } catch (err) {
-      console.error("Erreur lors de la récupération de l'historique des abonnements:", err);
+      logger.error("Erreur lors de la récupération de l'historique des abonnements:", err);
       setError(`Erreur: ${err.message}`);
     } finally {
       setIsProcessing(false);
@@ -467,7 +469,7 @@ const AdminPanel = () => {
         user.user_type.toLowerCase().includes(searchTerm.toLowerCase())
       ));
     } catch (err) {
-      console.error("Erreur lors de la mise à jour du rôle:", err);
+      logger.error("Erreur lors de la mise à jour du rôle:", err);
       setError(`Erreur: ${err.message}`);
     }
   };

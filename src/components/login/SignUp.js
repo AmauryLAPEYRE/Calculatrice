@@ -4,6 +4,8 @@ import { Helmet } from 'react-helmet';
 import { Link, useNavigate } from 'react-router-dom';
 import { registerUser, signInWithGoogle } from '../../services/authService';
 import { supabase } from '../../supabaseClient'; // Ajout pour récupérer les pays et langues
+// Import en haut
+import { useAuth } from '../../contexts/AuthContext';
 import { 
   Eye, 
   EyeOff, 
@@ -51,7 +53,8 @@ const SignUp = () => {
   const [languages, setLanguages] = useState([]);
   const [loadingCountries, setLoadingCountries] = useState(false);
   const [loadingLanguages, setLoadingLanguages] = useState(false);
-  
+  const { loginWithApple } = useAuth(); // ou loginWithGoogle selon le composant
+
   const navigate = useNavigate();
 
   // Animation au chargement
@@ -465,7 +468,25 @@ const setupAdvancedDefaults = async (countries, languages) => {
       setLoading(false);
     }
   };
-
+// Fonction de gestion :
+const handleAppleSignIn = async () => {
+  if (loading) return;
+  setError('');
+  setLoading(true);
+  
+  try {
+    const result = await loginWithApple();
+    if (result) {
+      navigate('/'); // ou autre redirection
+    }
+  } catch (error) {
+    if (error.message !== 'Connexion annulée') {
+      setError(error.message);
+    }
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <section className="min-h-screen bg-gradient-to-br from-green-50 to-white py-20">
       <Helmet>
@@ -597,7 +618,27 @@ const setupAdvancedDefaults = async (countries, languages) => {
                     </>
                   )}
                 </button>
-                
+                <button
+  type="button"
+  onClick={handleAppleSignIn}
+  className="w-full bg-black hover:bg-gray-800 text-white py-4 px-6 rounded-xl transform hover:scale-[1.02] transition-all duration-300 active:scale-[0.98] flex items-center justify-center disabled:opacity-70"
+  disabled={loading}
+>
+  {loading ? (
+    <>
+      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+      <span>Connexion...</span>
+    </>
+  ) : (
+    <>
+      {/* Icône Apple */}
+      <svg viewBox="0 0 24 24" width="20" height="20" className="mr-3" fill="currentColor">
+        <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+      </svg>
+      <span className="font-medium">Continuer avec Apple</span>
+    </>
+  )}
+</button>
                 {/* Séparateur */}
                 <div className="mb-6 relative">
                   <div className="absolute inset-0 flex items-center">

@@ -1,5 +1,7 @@
 // src/components/admin/AdminPendingChallenges.js - Amélioré avec sélection de trophées
 import React, { useState, useEffect } from 'react';
+// Utilisation Log/console Pour prod
+import {logger } from '../../utils/logger';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
   Trophy, 
@@ -153,7 +155,7 @@ const AdminPendingChallenges = () => {
       
       setAvailableBadges(data || []);
     } catch (err) {
-      console.error("Erreur lors du chargement des badges:", err);
+      logger.error("Erreur lors du chargement des badges:", err);
     }
   };
 
@@ -181,7 +183,7 @@ const AdminPendingChallenges = () => {
       setChallenges(data || []);
     } catch (err) {
       setError("Erreur lors du chargement des challenges: " + err.message);
-      console.error(err);
+      logger.error(err);
     } finally {
       setLoading(false);
     }
@@ -240,7 +242,7 @@ const AdminPendingChallenges = () => {
       });
       
     } catch (err) {
-      console.error("Erreur lors du chargement des statistiques:", err);
+      logger.error("Erreur lors du chargement des statistiques:", err);
     }
   };
 

@@ -1,5 +1,7 @@
 // src/components/admin/PendingChallenges.js
 import { useState, useEffect } from 'react';
+// Utilisation Log/console Pour prod
+import {logger } from '../../utils/logger';
 import { 
   Trophy, 
   Plus, 
@@ -85,7 +87,7 @@ const PendingChallenges = () => {
       setChallenges(data || []);
     } catch (err) {
       setError("Erreur lors du chargement des challenges: " + err.message);
-      console.error(err);
+      logger.error(err);
     } finally {
       setLoading(false);
     }
@@ -134,7 +136,7 @@ const PendingChallenges = () => {
       });
       
     } catch (err) {
-      console.error("Erreur lors du chargement des statistiques:", err);
+      logger.error("Erreur lors du chargement des statistiques:", err);
     }
   };
 

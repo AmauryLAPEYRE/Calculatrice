@@ -1,5 +1,7 @@
 // src/components/admin/CategoryManagement.js - Version complète avec ProfileLayout et navigation
 import React, { useState, useEffect } from 'react';
+// Utilisation Log/console Pour prod
+import {logger } from '../../utils/logger';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Plus,
@@ -104,7 +106,7 @@ const CategoryManagement = () => {
         .or('category_master.is.null,category_master.eq.');
 
       if (uncategorizedError) {
-        console.warn('Erreur lors du comptage des produits non catégorisés:', uncategorizedError);
+        logger.debug('Erreur lors du comptage des produits non catégorisés:', uncategorizedError);
         setUncategorizedCount(0);
       } else {
         setUncategorizedCount(uncategorizedProductsCount || 0);
@@ -118,7 +120,7 @@ const CategoryManagement = () => {
           .ilike('category_master', category.code);
 
         if (error) {
-          console.warn(`Erreur lors du comptage des produits pour la catégorie ${category.code}:`, error);
+          logger.debug(`Erreur lors du comptage des produits pour la catégorie ${category.code}:`, error);
           return { categoryCode: category.code, count: 0 };
         }
 

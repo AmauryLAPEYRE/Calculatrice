@@ -1,5 +1,7 @@
 // src/components/ProductDetail.js - Version modifiée avec étoiles précises
 import React, { useState, useEffect, useRef } from 'react';
+// Dans n'importe quel composant React existant
+import { supabase } from '../supabaseClient';
 import PriceHistory from './Review/PriceHistory';
 import { 
   Star, 
@@ -99,7 +101,13 @@ const ProductDetail = ({ product }) => {
       </div>
     );
   };
-
+useEffect(() => {
+  const debugAuth = async () => {
+    console.log('🔍 DEBUG - Utilisateur connecté:', await supabase.auth.getUser());
+    console.log('🔍 DEBUG - Session:', await supabase.auth.getSession());
+  };
+  debugAuth();
+}, []);
   useEffect(() => {
     setIsVisible(true);
   }, []);

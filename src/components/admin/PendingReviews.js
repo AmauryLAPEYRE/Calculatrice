@@ -1,5 +1,7 @@
 // src/components/admin/PendingReviews.js - Version avec gestion des raisons de rejet
 import React, { useState, useEffect } from 'react';
+// Utilisation Log/console Pour prod
+import {logger } from '../../utils/logger';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
   MessageSquare, 
@@ -101,7 +103,7 @@ const PendingReviews = () => {
         setTotalCount(count || 0);
         
       } catch (err) {
-        console.error("Erreur lors de la récupération des avis:", err);
+        logger.error("Erreur lors de la récupération des avis:", err);
         setError(`Impossible de charger les avis ${activeTab === 'pending' ? 'en attente' : activeTab === 'rejected' ? 'rejetés' : 'approuvés'}`);
       } finally {
         setLoading(false);
@@ -161,7 +163,7 @@ const PendingReviews = () => {
       setTotalCount(prev => prev - 1);
       
     } catch (err) {
-      console.error("Erreur lors de l'approbation de l'avis:", err);
+      logger.error("Erreur lors de l'approbation de l'avis:", err);
       setError("Erreur lors de l'approbation de l'avis. Veuillez réessayer.");
     } finally {
       setProcessingIds(prev => ({ ...prev, [reviewId]: null }));
@@ -222,7 +224,7 @@ const PendingReviews = () => {
       setError(null);
       
     } catch (err) {
-      console.error("Erreur lors du rejet de l'avis:", err);
+      logger.error("Erreur lors du rejet de l'avis:", err);
       setError("Erreur lors du rejet de l'avis. Veuillez réessayer.");
     } finally {
       setSubmittingRejection(false);
@@ -256,7 +258,7 @@ const PendingReviews = () => {
       setTotalCount(prev => prev - 1);
       
     } catch (err) {
-      console.error("Erreur lors de la remise en attente de l'avis:", err);
+      logger.error("Erreur lors de la remise en attente de l'avis:", err);
       setError("Erreur lors de la remise en attente de l'avis. Veuillez réessayer.");
     } finally {
       setProcessingIds(prev => ({ ...prev, [reviewId]: null }));
@@ -293,7 +295,7 @@ const PendingReviews = () => {
       setReceiptModalData(receiptData.firebase_url);
       
     } catch (err) {
-      console.error("Erreur lors de la récupération du ticket:", err);
+      logger.error("Erreur lors de la récupération du ticket:", err);
       setError("Impossible d'afficher le ticket de caisse");
     }
   };

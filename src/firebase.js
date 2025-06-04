@@ -28,25 +28,25 @@ const requiredEnvVars = [
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
-    console.error('❌ Variables d\'environnement Firebase manquantes:', missingEnvVars);
-    console.error('Assurez-vous que votre fichier .env contient toutes les variables nécessaires');
+    //console.error('❌ Variables d\'environnement Firebase manquantes:', missingEnvVars);
+    //console.error('Assurez-vous que votre fichier .env contient toutes les variables nécessaires');
 }
 
 // Initialiser Firebase
 let app;
 try {
     app = initializeApp(firebaseConfig);
-    console.log('✅ Firebase initialisé avec succès');
+    //console.log('✅ Firebase initialisé avec succès');
     
     // Afficher des informations de débogage en développement
     if (process.env.NODE_ENV === 'development') {
-        console.log('🔧 Mode développement - Configuration Firebase:');
-        console.log('- Project ID:', firebaseConfig.projectId);
-        console.log('- Auth Domain:', firebaseConfig.authDomain);
-        console.log('- Storage Bucket:', firebaseConfig.storageBucket);
+        //console.log('🔧 Mode développement - Configuration Firebase:');
+        //console.log('- Project ID:', firebaseConfig.projectId);
+        //console.log('- Auth Domain:', firebaseConfig.authDomain);
+        //console.log('- Storage Bucket:', firebaseConfig.storageBucket);
     }
 } catch (error) {
-    console.error('❌ Erreur lors de l\'initialisation de Firebase:', error);
+    //console.error('❌ Erreur lors de l\'initialisation de Firebase:', error);
     throw error;
 }
 
@@ -69,27 +69,27 @@ if (process.env.NODE_ENV === 'development' && useEmulators) {
         if (!isEmulatorConnected.auth) {
             connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
             isEmulatorConnected.auth = true;
-            console.log('🔧 Émulateur Auth connecté sur le port 9099');
+            //console.log('🔧 Émulateur Auth connecté sur le port 9099');
         }
         
         // Émulateur Firestore
         if (!isEmulatorConnected.firestore) {
             connectFirestoreEmulator(db, 'localhost', 8080);
             isEmulatorConnected.firestore = true;
-            console.log('🔧 Émulateur Firestore connecté sur le port 8080');
+            //console.log('🔧 Émulateur Firestore connecté sur le port 8080');
         }
         
         // Émulateur Storage
         if (!isEmulatorConnected.storage) {
             connectStorageEmulator(storage, 'localhost', 9199);
             isEmulatorConnected.storage = true;
-            console.log('🔧 Émulateur Storage connecté sur le port 9199');
+            //console.log('🔧 Émulateur Storage connecté sur le port 9199');
         }
         
-        console.log('✅ Tous les émulateurs Firebase sont connectés');
+        //console.log('✅ Tous les émulateurs Firebase sont connectés');
     } catch (error) {
-        console.warn('⚠️ Erreur lors de la connexion aux émulateurs:', error.message);
-        console.warn('Continuez en mode production...');
+        //console.warn('⚠️ Erreur lors de la connexion aux émulateurs:', error.message);
+        //console.warn('Continuez en mode production...');
     }
 }
 
@@ -117,10 +117,10 @@ export const checkFirebaseConnection = async () => {
             )
         ]);
         
-        console.log('✅ Connexion Firebase vérifiée');
+        //console.log('✅ Connexion Firebase vérifiée');
         return true;
     } catch (error) {
-        console.error('❌ Problème de connexion Firebase:', error);
+        //console.error('❌ Problème de connexion Firebase:', error);
         return false;
     }
 };
@@ -138,15 +138,15 @@ export const getFirebaseInfo = () => {
 
 // Fonction pour déboguer les problèmes d'authentification Google
 export const debugGoogleAuth = () => {
-    console.log('🔍 Débogage Google Auth:');
-    console.log('- Auth Domain:', auth.app.options.authDomain);
-    console.log('- Current Origin:', window.location.origin);
-    console.log('- Is Emulator:', useEmulators);
+    //console.log('🔍 Débogage Google Auth:');
+    //console.log('- Auth Domain:', auth.app.options.authDomain);
+    //console.log('- Current Origin:', window.location.origin);
+    //console.log('- Is Emulator:', useEmulators);
     
     // Vérifier si le domaine d'authentification est correct
     const expectedAuthDomain = `${firebaseConfig.projectId}.firebaseapp.com`;
     if (auth.app.options.authDomain !== expectedAuthDomain) {
-        console.warn(`⚠️ Auth Domain potentiellement incorrect. Attendu: ${expectedAuthDomain}, Actuel: ${auth.app.options.authDomain}`);
+        //console.warn(`⚠️ Auth Domain potentiellement incorrect. Attendu: ${expectedAuthDomain}, Actuel: ${auth.app.options.authDomain}`);
     }
 };
 

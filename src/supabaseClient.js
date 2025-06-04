@@ -1,19 +1,89 @@
-// src/supabaseClient.js
+// src/supabaseClient.js - Version corrigée avec bridge Firebase-Supabase
 import { createClient } from '@supabase/supabase-js';
+import { auth } from './firebase';
+// Utilisation Log/console Pour prod
+import {logger } from './utils/logger';
 
-// Récupérer les variables d'environnement pour Supabase
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
-// Créer le client Supabase
+
+// Votre création du client existante - NE CHANGEZ RIEN
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// NOUVELLE FONCTION - Ajoutez ça après export const supabase = ...
+export const getSupabaseWithAuth = async () => {
+  const headers = {};
+  
+  if (auth.currentUser) {
+    try {
+      const token = await auth.currentUser.getIdToken();
+      headers['x-firebase-uid'] = auth.currentUser.uid;
+      headers['x-firebase-token'] = token;
+      headers['x-firebase-email'] = auth.currentUser.email || '';
+    } catch (error) {
+      console.warn('Erreur récupération token Firebase:', error);
+    }
+  }
+logger.debug(' ---> HEADERS:', headers);
+  // Créer un nouveau client avec les headers
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: headers
+    }
+  });
+};
+
 /**
- * Synchronise un utilisateur Firebase avec Supabase
- * @param {Object} firebaseUser - L'utilisateur Firebase
- * @param {Object} additionalInfo - Informations supplémentaires comme les données d'adresse
- * @returns {Promise<Object>} - L'utilisateur créé ou mis à jour dans Supabase
+ * NOUVEAU: Fonction pour authentifier Supabase avec le token Firebase
+ * @param {string} firebaseToken - Token Firebase JWT
  */
+export const authenticateSupabaseWithFirebase = async (firebaseToken) => {
+  try {
+    if (!firebaseToken) {
+      console.warn('Pas de token Firebase fourni');
+      return null;
+    }
+
+    // Option 1: Utiliser Supabase Auth avec le token Firebase custom
+    // Cette méthode nécessite une configuration spéciale côté Supabase
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: 'firebase',
+      token: firebaseToken,
+    });
+
+    if (error) {
+      console.warn('Échec auth Supabase avec Firebase:', error);
+      return null;
+    }
+
+    console.log('✅ Authentification Supabase réussie avec token Firebase');
+    return data;
+  } catch (error) {
+    console.warn('Erreur auth Firebase->Supabase:', error);
+    return null;
+  }
+};
+
+/**
+ * Alternative: Créer un client Supabase avec token personnalisé
+ * @param {string} firebaseUid - UID Firebase de l'utilisateur
+ * @param {string} firebaseToken - Token Firebase JWT
+ */
+export const createAuthenticatedSupabaseClient = (firebaseUid, firebaseToken) => {
+  const authenticatedClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        'Authorization': `Bearer ${firebaseToken}`,
+        'X-Firebase-UID': firebaseUid, // Header personnalisé pour identifier l'utilisateur
+      }
+    }
+  });
+
+  return authenticatedClient;
+};
+
+// Reste de votre code existant...
 export const syncUserWithSupabase = async (firebaseUser, additionalInfo = {}) => {
   if (!firebaseUser) return null;
 
@@ -21,7 +91,7 @@ export const syncUserWithSupabase = async (firebaseUser, additionalInfo = {}) =>
     // Vérifier si l'utilisateur existe déjà dans Supabase
     const { data: existingUser, error: fetchError } = await supabase
       .from('users')
-      .select('*') // Utiliser SELECT * pour récupérer tous les champs
+      .select('*')
       .eq('firebase_uid', firebaseUser.uid)
       .single();
 
@@ -37,18 +107,16 @@ export const syncUserWithSupabase = async (firebaseUser, additionalInfo = {}) =>
         updated_at: new Date()
       };
 
-      // Ajouter les champs d'adresse s'ils sont fournis
       if (additionalInfo.country) updates.country = additionalInfo.country;
       if (additionalInfo.city) updates.city = additionalInfo.city;
       if (additionalInfo.postalCode) updates.postal_code = additionalInfo.postalCode;
-          // Ajouter le champ langue s'il est fourni
       if (additionalInfo.language) updates.language = additionalInfo.language;
 
       const { data: updatedUser, error: updateError } = await supabase
         .from('users')
         .update(updates)
         .eq('firebase_uid', firebaseUser.uid)
-        .select('*'); // Assurez-vous de sélectionner tous les champs après la mise à jour
+        .select('*');
 
       if (updateError) throw updateError;
       
@@ -69,17 +137,13 @@ export const syncUserWithSupabase = async (firebaseUser, additionalInfo = {}) =>
         scan_count: 0,
         status: 'bronze',
         is_suspended: false,
-        // Ajouter les champs d'adresse s'ils sont fournis
         country: additionalInfo.country || null,
         city: additionalInfo.city || null,
         postal_code: additionalInfo.postalCode || null,
-        // Ajouter le champ langue s'il est fourni
-        language: additionalInfo.language || 'fr', // Définir français comme langue par défaut
-        // Ajouter les champs avatar
-        avatar_seed: firebaseUser.uid, // Utiliser l'UID comme seed par défaut
-        avatar_url: null // Pas d'avatar personnalisé par défaut
+        language: additionalInfo.language || 'fr',
+        avatar_seed: firebaseUser.uid,
+        avatar_url: null
       };
-
 
       const { data: createdUser, error: createError } = await supabase
         .from('users')
@@ -87,7 +151,7 @@ export const syncUserWithSupabase = async (firebaseUser, additionalInfo = {}) =>
         .select('*');
 
       if (createError) throw createError;
-      // Créer automatiquement l'abonnement Essential gratuit d'une semaine
+      
       if (createdUser && createdUser[0]) {
         await createWelcomeSubscription(createdUser[0].id);
       }

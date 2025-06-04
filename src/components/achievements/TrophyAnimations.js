@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Lottie from 'lottie-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import { Trophy } from 'lucide-react';
+import { Trophy, Lock } from 'lucide-react'; // AJOUT DE LOCK ICI
 
 // URLs des animations Lottie gratuites (depuis LottieFiles)
 const LOTTIE_ANIMATIONS = {
@@ -395,5 +395,3 @@ export const useTrophyAnimations = () => {
     onAnimationComplete
   };
 };
-
-export default TrophyAnimations;
